@@ -1,0 +1,12 @@
+[package]
+name = "rust_solver"
+version = "0.1.0"
+edition = "2024"
+description = "A generic Constraint Satisfaction Problem (CSP) framework in Rust"
+license = "MIT"
+repository = "https://github.com/cponcelets/rust-solver"
+authors = ["Clément Poncelet Sanchez"]
+
+[dependencies]
+petgraph = "0.8.3"
+statrs = "0.18.0"
