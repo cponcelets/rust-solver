@@ -4,8 +4,8 @@ use std::rc::Rc;
 use petgraph::graph::UnGraph;
 use statrs::function::factorial::binomial;
 use crate::csp::constraint::traits::Constraint;
-use crate::csp::domain::extdom::CartesianWalker;
-use crate::csp::domain::traits::OrdT;
+use crate::csp::domain::setdom::CartesianWalker;
+use crate::csp::domain::traits::{Domain, OrdT};
 use crate::csp::truth::Truth;
 use crate::csp::variable::extvar::ExVar;
 use crate::csp::variable::vvalue::{vv, VValue};
@@ -14,6 +14,7 @@ pub struct Csp<T:OrdT> {
     vars : HashMap<String, Rc<ExVar<T>>>,
     constraints : Vec<Box<dyn Constraint<T>>>
 }
+//TODO: level, the current number of instantiated variables (also called `past variables`)
 
 impl<T:OrdT> Csp<T> {
     pub fn new (v: HashMap<String, Rc<ExVar<T>>>, c: Vec<Box<dyn Constraint<T>>>) -> Csp<T> {
@@ -214,7 +215,7 @@ fn scope_key<T:OrdT>(c: &dyn Constraint<T>) -> Vec<String> {
 }
 
 pub fn exists_extension<T: OrdT>(asn: &[VValue<T>], missing_vars: &Vec<Rc<ExVar<T>>>, constraint: impl Fn(&Vec<VValue<T>>) -> bool) -> bool {
-    let missing_doms: Vec<_> = missing_vars.iter().map(|v| v.dom()).collect();
+    let missing_doms: Vec<_> = missing_vars.iter().map(|v| v.dom().active_values()).collect();
     let walker = CartesianWalker::new(missing_doms);
 
     for tuple in walker {
@@ -237,13 +238,13 @@ use std::collections::HashMap;
     use crate::{dom, var};
     use crate::csp::constraint::intensional::{EqConstraint, LtConstraint, NeqConstraint};
     use crate::csp::csp::Csp;
-    use crate::csp::domain::extdom::ExDom;
+    use crate::csp::domain::setdom::SetDom;
     use crate::csp::domain::traits::OrdT;
     use crate::csp::variable::extvar::{generate_variables, ExVar};
     use crate::csp::variable::vvalue::{vv, VValue};
 
     fn setup_csp<'a, T: OrdT>() -> (Csp<i32>, Rc<ExVar<i32>>, Rc<ExVar<i32>>, Rc<ExVar<i32>>) {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
         let x = var!("x".into(), dom.clone());
         let y = var!("y".into(), dom.clone());
@@ -263,7 +264,7 @@ use std::collections::HashMap;
 
     #[test]
     fn color_constraints() {
-        let dom_color = ExDom::new(vec!["dg", "mg", "lg", "w"]);
+        let dom_color = SetDom::new(vec!["dg", "mg", "lg", "w"]);
         let vmap = generate_variables("x", 9, &dom_color);
         let p_init = Csp::new(vmap.clone(),
                                    {vec![

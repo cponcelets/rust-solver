@@ -10,9 +10,10 @@
 ***************************************/
 use std::cmp::Ordering::Equal;
 use std::fmt;
+use std::ops::Deref;
 use std::rc::Rc;
-use crate::csp::domain::extdom::{CartesianWalker, ExDom};
-use crate::csp::domain::traits::OrdT;
+use crate::csp::domain::setdom::{CartesianWalker};
+use crate::csp::domain::traits::{Domain, OrdT};
 use crate::csp::truth::Truth;
 use crate::csp::variable::extvar::ExVar;
 use crate::csp::variable::vvalue::{make_assignment, VValue};
@@ -263,7 +264,7 @@ pub trait Constraint<T:OrdT> {
         //extend to cartesian product for any cardinality
         for x in self.scp()[0].valid_values() {
             for y in self.scp()[1].valid_values() {
-                if self.apply(x, y) {
+                if self.apply(&x, &y) {
                     allowed += 1;
                 }
             }
@@ -281,7 +282,7 @@ pub trait Constraint<T:OrdT> {
         //extend to cartesian product for any cardinality
         for x in self.scp()[0].valid_values() {
             for y in self.scp()[1].valid_values() {
-                if !self.apply(x, y) {
+                if !self.apply(&x, &y) {
                     forbidden += 1;
                 }
             }
@@ -339,12 +340,11 @@ pub trait Constraint<T:OrdT> {
             .product()
     }
 
-    fn cartesian_product(&self) -> CartesianWalker<'_, T> {
-        let doms: Vec<&ExDom<T>> =
-            self.scp()
-                .iter()
-                .map(|v| v.dom())
-                .collect();
+    fn cartesian_product(&self) -> CartesianWalker<T> {
+        let doms: Vec<Vec<T>> = self.scp()
+            .iter()
+            .map(|v| v.dom().active_values())
+            .collect();
         CartesianWalker::new(doms)
     }
 }

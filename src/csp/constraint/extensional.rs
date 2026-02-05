@@ -82,14 +82,14 @@ mod tests {
 use std::rc::Rc;
     use crate::csp::constraint::extensional::ExtConstraint;
     use crate::csp::constraint::traits::Constraint;
-    use crate::csp::domain::extdom::ExDom;
+    use crate::csp::domain::setdom::SetDom;
     use crate::csp::truth::Truth;
     use crate::csp::variable::extvar::ExVar;
     use crate::vvals;
 
     #[test]
     fn ext_constraint_rel() {
-        let dom = ExDom::new(vec![1, 2, 3]);
+        let dom = SetDom::new(vec![1, 2, 3]);
 
         let x = Rc::new(ExVar::new("x".into(), dom.clone()));
         let y = Rc::new(ExVar::new("y".into(), dom));
@@ -109,7 +109,7 @@ use std::rc::Rc;
 
     #[test]
     fn ext_constraint_support() {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
         let x = Rc::new(ExVar::new("x".into(), dom.clone()));
         let y = Rc::new(ExVar::new("y".into(), dom));
@@ -132,7 +132,7 @@ use std::rc::Rc;
 
     #[test]
     fn ext_constraint_tightness() {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
         let x = Rc::new(ExVar::new("x".into(), dom.clone()));
         let y = Rc::new(ExVar::new("y".into(), dom));

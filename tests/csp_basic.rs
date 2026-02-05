@@ -1,20 +1,23 @@
 use crate::extvar::ExVar;
 use std::collections::HashMap;
 use std::rc::Rc;
+use rust_solver::csp::constraint::traits::Constraint;
 use rust_solver::csp::csp::Csp;
 use rust_solver::csp::prelude::*;
-use rust_solver::csp::domain::extdom::{ExDom};
+use rust_solver::csp::domain::setdom::{SetDom};
+use rust_solver::csp::domain::traits::Domain;
 use rust_solver::csp::prelude::intensional::{EqConstraint, LtConstraint, NeqConstraint};
 use rust_solver::csp::prelude::vvalue::vv;
+use rust_solver::var;
 
 #[test]
 fn test_lc_and_solution() { //Book's Example
-    let dom012 = ExDom::new(vec![0, 1, 2]);
+    let dom012 = SetDom::new(vec![0, 1, 2]);
 
     let vmap = HashMap::from([
-        (String::from("x"), Rc::new(ExVar::new(String::from("x"), dom012.clone()))),
-        (String::from("y"), Rc::new(ExVar::new(String::from("y"), dom012.clone()))),
-        (String::from("z"), Rc::new(ExVar::new(String::from("z"), dom012.clone())))
+        (String::from("x"), Rc::new(ExVar::new(String::from("x"), dom012.snapshot()))),
+        (String::from("y"), Rc::new(ExVar::new(String::from("y"), dom012.snapshot()))),
+        (String::from("z"), Rc::new(ExVar::new(String::from("z"), dom012.snapshot())))
     ]);
 
     let p_init = Csp::new(vmap.clone(),
@@ -71,4 +74,67 @@ fn test_lc_and_solution() { //Book's Example
     assert_eq!(p_init.is_globally_consistent(&iyz_lc), Truth::False);
     let ix_lc = vec![vv(String::from("x"), 2)];
     assert_eq!(p_init.is_globally_consistent(&ix_lc), Truth::False);
+}
+
+fn small_csp() -> Csp<i32> {
+    let dom = SetDom::new(vec![1,2]);
+
+    let x = var!("x".into(), dom.snapshot());
+    let y = var!("y".into(), dom.snapshot());
+    let z = var!("z".into(), dom.snapshot());
+    let mut vmap = HashMap::new();
+    vmap.insert("x".into(), x.clone());
+    vmap.insert("y".into(), y.clone());
+    vmap.insert("z".into(), z.clone());
+
+    let c1 = EqConstraint::new(x.clone(), y.clone()); // x = y
+    let c2 = LtConstraint::new(y.clone(), z.clone()); // y < z
+
+    Csp::new(vmap, vec![Box::new(c1), Box::new(c2)])
+}
+
+#[test]
+fn csp_local_consistency() {
+    let csp = small_csp();
+
+    for c in csp.constraints() {
+        for var in c.scp() {
+            for v in var.dom().iter_on_active() {
+                let vv = vv(var.label().clone(), v.clone());
+                let t = c.is_support(&vv);
+                assert_ne!(t, Truth::Unknown);
+            }
+        }
+    }
+}
+
+#[test]
+fn csp_is_normalized() {
+    let csp = small_csp();
+    assert!(csp.is_normalized());
+}
+
+#[test]
+fn rel_matches_support() {
+    let csp = small_csp();
+
+    for c in csp.constraints() {
+        let rel = c.rel();
+        for tuple in rel {
+            assert_eq!(c.check_assignment(&tuple), Truth::True);
+        }
+    }
+}
+
+#[test]
+fn trailing_preserves_consistency() {
+    let dom = SetDom::new(vec![1,2]);
+    let x = var!("x".into(), dom.snapshot());
+    let y = var!("y".into(), dom.snapshot());
+    let c = EqConstraint::new(x.clone(), y.clone());
+
+    assert_eq!(c.is_support(&vv("x".into(), 1)), Truth::True);
+
+    x.dom_mut().remove_value(&1, 1);
+    assert_eq!(c.is_support(&vv("x".into(), 1)), Truth::False);
 }

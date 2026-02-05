@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use petgraph::dot::Dot;
 use rust_solver::csp::csp::Csp;
-use rust_solver::csp::prelude::extdom::ExDom;
+use rust_solver::csp::prelude::setdom::SetDom;
 use rust_solver::csp::prelude::extvar::{generate_variables, ExVar};
 use rust_solver::csp::prelude::intensional::{EqConstraint, LtConstraint, NeqConstraint};
 
 #[test]
 fn test_graphs() {
-    let dom012 = ExDom::new(vec![0, 1, 2]);
+    let dom012 = SetDom::new(vec![0, 1, 2]);
     let vmap = HashMap::from([
         (String::from("x"), Rc::new(ExVar::new(String::from("x"), dom012.clone()))),
         (String::from("y"), Rc::new(ExVar::new(String::from("y"), dom012.clone()))),
@@ -52,7 +52,7 @@ fn test_graphs() {
 
 #[test]
 fn test_graph_color() {
-    let dom_color = ExDom::new(vec!["dg", "mg", "lg", "w"]);
+    let dom_color = SetDom::new(vec!["dg", "mg", "lg", "w"]);
     let vmap = generate_variables("x", 9, &dom_color);
     let p_init = Csp::new(vmap.clone(),
                                             {vec![

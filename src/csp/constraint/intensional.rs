@@ -93,17 +93,18 @@ mod tests {
     use std::rc::Rc;
     use crate::csp::constraint::intensional::{EqConstraint, LtConstraint, NeqConstraint};
     use crate::csp::constraint::traits::Constraint;
-    use crate::csp::domain::extdom::ExDom;
+    use crate::csp::domain::setdom::SetDom;
+    use crate::csp::domain::traits::Domain;
     use crate::csp::truth::Truth;
     use crate::csp::variable::extvar::ExVar;
     use crate::csp::variable::vvalue::{vv, VValue};
-    use crate::vvals;
+    use crate::{var, vvals};
 
     #[test]
     fn check_invalid_value_is_false() {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = EqConstraint::new(x.clone(), y.clone());
@@ -116,9 +117,9 @@ mod tests {
 
     #[test]
     fn support_implies_valid() {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = EqConstraint::new(x.clone(), y.clone());
@@ -131,8 +132,8 @@ mod tests {
 
     #[test]
     fn allowed_but_not_valid() {
-        let dom12 = ExDom::new(vec![1, 2]);
-        let dom123 = ExDom::new(vec![1, 2, 3]);
+        let dom12 = SetDom::new(vec![1, 2]);
+        let dom123 = SetDom::new(vec![1, 2, 3]);
 
         let x = Rc::new(ExVar::new("x".into(), dom12));
         let y = Rc::new(ExVar::new("y".into(), dom123));
@@ -153,9 +154,9 @@ mod tests {
 
     #[test]
     fn support_is_not_conflict() {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = EqConstraint::new(x.clone(), y.clone());
@@ -168,9 +169,9 @@ mod tests {
 
     #[test]
     fn valid_but_conflict() {
-        let dom = ExDom::new(vec![1, 2, 3]);
+        let dom = SetDom::new(vec![1, 2, 3]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = LtConstraint::new(x.clone(), y.clone());
@@ -184,9 +185,9 @@ mod tests {
 
     #[test]
     fn allowed_but_conflict() {
-        let dom = ExDom::new(vec![1]);
+        let dom = SetDom::new(vec![1]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = NeqConstraint::new(x.clone(), y.clone());
@@ -201,9 +202,9 @@ mod tests {
 
     #[test]
     fn unknown_variable_truths() {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = EqConstraint::new(x, y);
@@ -218,9 +219,9 @@ mod tests {
 
     #[test]
     fn unknown_propagation() {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = EqConstraint::new(x.clone(), y.clone());
@@ -232,9 +233,9 @@ mod tests {
 
     #[test]
     fn eq_constraint_assignment() {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = EqConstraint::new(x.clone(), y.clone());
@@ -252,9 +253,9 @@ mod tests {
 
     #[test]
     fn eq_constraint_strict_support() {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = EqConstraint::new(x.clone(), y.clone());
@@ -272,9 +273,9 @@ mod tests {
 
     #[test]
     fn neq_constraint_support() {
-        let dom = ExDom::new(vec![1, 2]);
+        let dom = SetDom::new(vec![1, 2]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = NeqConstraint::new(x.clone(), y.clone());
@@ -287,9 +288,9 @@ mod tests {
 
     #[test]
     fn lt_constraint_support() {
-        let dom = ExDom::new(vec![1, 2, 3]);
+        let dom = SetDom::new(vec![1, 2, 3]);
 
-        let x = Rc::new(ExVar::new("x".into(), dom.clone()));
+        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
         let c = LtConstraint::new(x.clone(), y.clone());
@@ -307,8 +308,8 @@ mod tests {
 
     #[test]
     fn lt_looseness() { //Figure1.4 book
-        let domx = ExDom::new(vec![1, 2, 3]);
-        let domy = ExDom::new(vec![0, 1, 2, 3]);
+        let domx = SetDom::new(vec![1, 2, 3]);
+        let domy = SetDom::new(vec![0, 1, 2, 3]);
 
         let x = Rc::new(ExVar::new("x".into(), domx));
         let y = Rc::new(ExVar::new("y".into(), domy));
@@ -330,8 +331,8 @@ mod tests {
     #[test]
     fn constraint_entail() {
         //val(c) = sup(c)
-        let domx = ExDom::new(vec![1, 2]);
-        let domy = ExDom::new(vec![3, 4]);
+        let domx = SetDom::new(vec![1, 2]);
+        let domy = SetDom::new(vec![3, 4]);
 
         let x = Rc::new(ExVar::new("x".into(), domx));
         let y = Rc::new(ExVar::new("y".into(), domy));
@@ -344,8 +345,8 @@ mod tests {
     #[test]
     fn constraint_disentail() {
         //val(c) = sup(c)
-        let domx = ExDom::new(vec![3, 4]);
-        let domy = ExDom::new(vec![1, 2]);
+        let domx = SetDom::new(vec![3, 4]);
+        let domy = SetDom::new(vec![1, 2]);
 
         let x = Rc::new(ExVar::new("x".into(), domx));
         let y = Rc::new(ExVar::new("y".into(), domy));
@@ -353,5 +354,23 @@ mod tests {
         let c = LtConstraint::new(x.clone(), y.clone());
 
         assert_eq!(c.is_disentailed(), true);
+    }
+
+    #[test]
+    fn support_removed_by_trailing() {
+        let mut d1 = SetDom::new(vec![1,2]);
+        let mut d2 = SetDom::new(vec![1,2]);
+
+        let x = var!("x".into(), d1);
+        let y = var!("y".into(), d2);
+
+        let c = LtConstraint::new(x.clone(), y.clone());
+        let vv = vv(x.label().clone(), 1);
+
+        assert_eq!(c.is_support(&vv), Truth::True);
+
+        c.operands[1].dom_mut().remove_value(&2, 1); // y cannot be 2 anymore
+
+        assert_eq!(c.is_support(&vv), Truth::False);
     }
 }

@@ -15,7 +15,7 @@
 #[macro_export]
 macro_rules! dom {
      ($($x:expr),+ $(,)?) => {
-        ExDom::new(vec![$($x),+])
+        SetDom::new(vec![$($x),+])
     };
 }
 
