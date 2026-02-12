@@ -8,7 +8,7 @@
 /**************************************
             SetDom
 ***************************************/
-use crate::csp::domain::traits::{Domain, OrdT};
+use crate::csp::domain::domain::{Domain, OrdT};
 
 #[derive(Debug, Clone)]
 #[derive(PartialEq, PartialOrd)]
@@ -257,7 +257,7 @@ impl<T:OrdT> Iterator for CartesianWalker<T> {
 #[cfg(test)]
 mod tests {
 use crate::csp::domain::setdom::{SetDom, CartesianWalker};
-    use crate::csp::domain::traits::Domain;
+    use crate::csp::domain::domain::Domain;
 
     #[test]
     fn domain_size_after_remove() {

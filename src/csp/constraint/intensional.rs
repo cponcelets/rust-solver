@@ -4,126 +4,132 @@
 ***************************************/
 
 /**************************************
-            EqConstraint
+              Factory
 ***************************************/
+
+
+/**************************************
+   Formula (Intensional Constraints)
+***************************************/
+use std::collections::HashSet;
 use std::fmt;
+use std::fmt::{Debug, Display};
 use std::rc::Rc;
-use crate::csp::constraint::traits::Constraint;
-use crate::csp::domain::traits::OrdT;
+use crate::atom;
+use crate::csp::ast::eval::Eval;
+use crate::csp::ast::formula::{eval_formula, formula_scope, Formula};
+use crate::csp::ast::pred::{pred_scope, Pred};
+use crate::csp::constraint::constraint::Constraint;
+use crate::csp::domain::domain::OrdT;
 use crate::csp::variable::extvar::ExVar;
-
-pub struct EqConstraint<T:OrdT> {
-    operands: [Rc<ExVar<T>>; 2],
+use crate::csp::variable::vvalue::VValue;
+pub struct Intensional<T:OrdT, E:Eval> {
+    scope:      Vec<Rc<ExVar<T>>>,
+    formula: Rc<Formula<E>>
 }
 
-impl<T:OrdT> EqConstraint<T> {
-    pub fn new(left: Rc<ExVar<T>>, right: Rc<ExVar<T>>) -> Self {
-        Self { operands: [left, right] }
+impl<T:OrdT, E:Eval<Output = T>> Intensional<T, E> {
+    pub fn new(scope: Vec<Rc<ExVar<T>>>, constraint: Rc<Formula<E>>) -> Self {
+        let mut scp = scope.clone();
+        //reorder if not lexicographic order
+        scp.sort_by(|a, b| a.label().cmp(b.label()));
+        Self { scope: scp, formula: constraint }
+    }
+
+    pub fn from_formula(constraint: Rc<Formula<E>>) -> Self {
+        let mut scope = HashSet::new();
+        formula_scope(&constraint, &mut scope);
+        let mut scp: Vec<_> = scope.into_iter().collect();
+        //reorder if not lexicographic order
+        scp.sort_by(|a, b| a.label().cmp(b.label()));
+        Self { scope: scp, formula: constraint }
+    }
+
+    pub fn from_pred(pred: Pred<E>) -> Self {
+        let mut scope = HashSet::new();
+        pred_scope(&pred, &mut scope);
+        let mut scp: Vec<_> = scope.into_iter().collect();
+        //reorder if not lexicographic order
+        scp.sort_by(|a, b| a.label().cmp(b.label()));
+        Self { scope: scp, formula: Rc::new(atom!(pred))}
     }
 }
 
-impl<T:OrdT> Constraint<T> for EqConstraint<T> {
+impl<T:OrdT, E:Eval<Output = T>> Constraint<T> for Intensional<T, E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} == {}", self.operands[0].label(), self.operands[1].label())
+        write!(f, "{}", self.formula)
     }
 
-    fn apply(&self, x: &T, y: &T) -> bool {
-        x == y
+    fn apply(&self, asn: &Vec<VValue<T>>) -> bool {
+        eval_formula(&self.formula, asn).to_bool().unwrap()
     }
 
-    fn scp(&self) -> &[Rc<ExVar<T>>] { &self.operands }
+    fn scp(&self) -> &[Rc<ExVar<T>>] {
+        &self.scope
+    }
 }
+
+impl<T: OrdT, E: Eval<Output = T>> Debug for Intensional<T, E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Intensional")
+            .field("scope", &self.scope)
+            .field("formula", &self.formula)
+            .finish()
+    }
+}
+
+impl<T:OrdT, E:Eval<Output = T>> Display for Intensional<T, E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self, f)
+    }
+}
+
 
 /**************************************
-            LtConstraint
-***************************************/
-pub struct LtConstraint<T:OrdT> {
-    operands: [Rc<ExVar<T>>; 2],
-}
-
-impl<T:OrdT> LtConstraint<T> {
-    pub fn new(left: Rc<ExVar<T>>, right: Rc<ExVar<T>>) -> Self {
-        Self { operands: [left, right] }
-    }
-}
-
-impl<T: OrdT> Constraint<T> for LtConstraint<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} < {}", self.operands[0].label(), self.operands[1].label())
-    }
-
-    //other.domain().min() <= v && v <= other.domain().max()
-    fn apply(&self, x: &T, y: &T) -> bool {
-        x < y
-    }
-
-    fn scp(&self) -> &[Rc<ExVar<T>>] { &self.operands }
-}
-
-/**************************************
-            NeqConstraint
-***************************************/
-pub struct NeqConstraint<T: OrdT> {
-    operands: [Rc<ExVar<T>>; 2],
-}
-
-impl<T: OrdT> NeqConstraint<T> {
-    pub fn new(left: Rc<ExVar<T>>, right: Rc<ExVar<T>>) -> Self {
-        Self { operands: [left, right] }
-    }
-}
-
-impl<T: OrdT> Constraint<T> for NeqConstraint<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} != {}", self.operands[0].label(), self.operands[1].label())
-    }
-
-    fn apply(&self, x: &T, y: &T) -> bool {
-        x != y
-    }
-    fn scp(&self) -> &[Rc<ExVar<T>>] { &self.operands }
-}
-
-/**************************************
-        Test
+        Unit Tests
 ***************************************/
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-    use crate::csp::constraint::intensional::{EqConstraint, LtConstraint, NeqConstraint};
-    use crate::csp::constraint::traits::Constraint;
+    use crate::csp::ast::expr::Expr;
+use crate::csp::ast::pred::Pred;
+use crate::csp::ast::formula::Formula;
+use std::rc::Rc;
+    use crate::csp::constraint::constraint::Constraint;
     use crate::csp::domain::setdom::SetDom;
-    use crate::csp::domain::traits::Domain;
+    use crate::csp::domain::domain::Domain;
     use crate::csp::truth::Truth;
     use crate::csp::variable::extvar::ExVar;
     use crate::csp::variable::vvalue::{vv, VValue};
-    use crate::{var, vvals};
+    use crate::{atom, cst, eq, lt, neq, var, var_dom, vvals};
+    use crate::csp::constraint::intensional::Intensional;
 
     #[test]
     fn check_invalid_value_is_false() {
         let dom = SetDom::new(vec![1, 2]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = EqConstraint::new(x.clone(), y.clone());
-
+        // x == y
+        let f = Rc::new(atom!(eq!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
+        //(x,3)
         let vv = VValue { label: "x".into(), value: 3 };
 
         assert_eq!(c.is_valid(&vv), Truth::False);
-        assert_eq!(c.check(&vv), Truth::False);
+        assert_eq!(c.is_allowed(&vv), Truth::False);
     }
 
     #[test]
     fn support_implies_valid() {
         let dom = SetDom::new(vec![1, 2]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = EqConstraint::new(x.clone(), y.clone());
-
+        // x == y
+        let f = Rc::new(atom!(eq!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
+        //(x,1)
         let vv = VValue { label: "x".into(), value: 1 };
 
         assert_eq!(c.is_support(&vv), Truth::True);
@@ -134,12 +140,13 @@ mod tests {
     fn allowed_but_not_valid() {
         let dom12 = SetDom::new(vec![1, 2]);
         let dom123 = SetDom::new(vec![1, 2, 3]);
-
         let x = Rc::new(ExVar::new("x".into(), dom12));
         let y = Rc::new(ExVar::new("y".into(), dom123));
 
-        let c = EqConstraint::new(x.clone(), y.clone());
-
+        // x == y
+        let f = Rc::new(atom!(eq!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
+        //(x,3)
         let vv = VValue { label: "x".into(), value: 3 };
 
         // 3 == 3 is allowed by equality
@@ -155,12 +162,13 @@ mod tests {
     #[test]
     fn support_is_not_conflict() {
         let dom = SetDom::new(vec![1, 2]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = EqConstraint::new(x.clone(), y.clone());
-
+        // x == y
+        let f = Rc::new(atom!(eq!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
+        //(x,1)
         let vv = VValue { label: "x".into(), value: 1 };
 
         assert_eq!(c.is_support(&vv), Truth::True);
@@ -170,12 +178,13 @@ mod tests {
     #[test]
     fn valid_but_conflict() {
         let dom = SetDom::new(vec![1, 2, 3]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = LtConstraint::new(x.clone(), y.clone());
-
+        // x < y
+        let f = Rc::new(atom!(lt!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
+        //(x,3)
         let vv = VValue { label: "x".into(), value: 3 };
 
         assert_eq!(c.is_valid(&vv), Truth::True);
@@ -186,12 +195,13 @@ mod tests {
     #[test]
     fn allowed_but_conflict() {
         let dom = SetDom::new(vec![1]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = NeqConstraint::new(x.clone(), y.clone());
-
+        // x <> y
+        let f = Rc::new(atom!(neq!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
+        //(x,1)
         let vv = VValue { label: "x".into(), value: 1 };
 
         assert_eq!(c.is_allowed(&vv), Truth::False);
@@ -203,12 +213,13 @@ mod tests {
     #[test]
     fn unknown_variable_truths() {
         let dom = SetDom::new(vec![1, 2]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = EqConstraint::new(x, y);
-
+        // x == y
+        let f = Rc::new(atom!(eq!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
+        //(z,1)
         let vv = VValue { label: "z".into(), value: 1 };
 
         assert_eq!(c.is_valid(&vv), Truth::Unknown);
@@ -220,12 +231,13 @@ mod tests {
     #[test]
     fn unknown_propagation() {
         let dom = SetDom::new(vec![1, 2]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = EqConstraint::new(x.clone(), y.clone());
-
+        // x == y
+        let f = Rc::new(atom!(eq!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
+        //(z,1)
         let vv = VValue { label: "z".into(), value: 1 };
 
         assert_eq!(c.is_valid(&vv), Truth::Unknown);
@@ -234,11 +246,12 @@ mod tests {
     #[test]
     fn eq_constraint_assignment() {
         let dom = SetDom::new(vec![1, 2]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = EqConstraint::new(x.clone(), y.clone());
+        // x == y
+        let f = Rc::new(atom!(eq!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
 
         assert_eq!(
             c.check_assignment(&vvals!("x" => 1, "y" => 1)),
@@ -254,11 +267,12 @@ mod tests {
     #[test]
     fn eq_constraint_strict_support() {
         let dom = SetDom::new(vec![1, 2]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = EqConstraint::new(x.clone(), y.clone());
+        // x == y
+        let f = Rc::new(atom!(eq!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
 
         assert_eq!(
             c.strict_support(&VValue { label: "x".into(), value: 1 }),
@@ -274,11 +288,12 @@ mod tests {
     #[test]
     fn neq_constraint_support() {
         let dom = SetDom::new(vec![1, 2]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = NeqConstraint::new(x.clone(), y.clone());
+        // x == y
+        let f = Rc::new(atom!(eq!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
 
         assert_eq!(
             c.strict_support(&VValue { label: "x".into(), value: 1 }),
@@ -289,11 +304,12 @@ mod tests {
     #[test]
     fn lt_constraint_support() {
         let dom = SetDom::new(vec![1, 2, 3]);
-
-        let x = Rc::new(ExVar::new("x".into(), Clone::clone(&dom)));
+        let x = Rc::new(ExVar::new("x".into(), dom.snapshot()));
         let y = Rc::new(ExVar::new("y".into(), dom));
 
-        let c = LtConstraint::new(x.clone(), y.clone());
+        // x < y
+        let f = Rc::new(atom!(lt!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
 
         assert_eq!(
             c.strict_support(&VValue { label: "x".into(), value: 3 }),
@@ -310,11 +326,12 @@ mod tests {
     fn lt_looseness() { //Figure1.4 book
         let domx = SetDom::new(vec![1, 2, 3]);
         let domy = SetDom::new(vec![0, 1, 2, 3]);
-
         let x = Rc::new(ExVar::new("x".into(), domx));
         let y = Rc::new(ExVar::new("y".into(), domy));
 
-        let c = LtConstraint::new(x.clone(), y.clone());
+        // x < y
+        let f = Rc::new(atom!(lt!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
 
         assert_eq!(c.rel().len(), 3);
         assert_eq!(c.is_valid(&vv("x".into(), 3)), Truth::True);
@@ -333,11 +350,12 @@ mod tests {
         //val(c) = sup(c)
         let domx = SetDom::new(vec![1, 2]);
         let domy = SetDom::new(vec![3, 4]);
-
         let x = Rc::new(ExVar::new("x".into(), domx));
         let y = Rc::new(ExVar::new("y".into(), domy));
 
-        let c = LtConstraint::new(x.clone(), y.clone());
+        // x < y
+        let f = Rc::new(atom!(lt!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
 
         assert_eq!(c.is_entailed(), true);
     }
@@ -347,30 +365,49 @@ mod tests {
         //val(c) = sup(c)
         let domx = SetDom::new(vec![3, 4]);
         let domy = SetDom::new(vec![1, 2]);
-
         let x = Rc::new(ExVar::new("x".into(), domx));
         let y = Rc::new(ExVar::new("y".into(), domy));
 
-        let c = LtConstraint::new(x.clone(), y.clone());
+        // x < y
+        let f = Rc::new(atom!(lt!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x,y], f);
 
         assert_eq!(c.is_disentailed(), true);
     }
 
     #[test]
     fn support_removed_by_trailing() {
-        let mut d1 = SetDom::new(vec![1,2]);
-        let mut d2 = SetDom::new(vec![1,2]);
+        let d1 = SetDom::new(vec![1,2]);
+        let d2 = SetDom::new(vec![1,2]);
+        let x = var_dom!("x".into(), d1);
+        let y = var_dom!("y".into(), d2);
 
-        let x = var!("x".into(), d1);
-        let y = var!("y".into(), d2);
-
-        let c = LtConstraint::new(x.clone(), y.clone());
+        // x < y
+        let f = Rc::new(atom!(lt!(var!(x), var!(y))));
+        let c = Intensional::new(vec![x.clone(),y], f);
+        //(x,1)
         let vv = vv(x.label().clone(), 1);
 
         assert_eq!(c.is_support(&vv), Truth::True);
 
-        c.operands[1].dom_mut().remove_value(&2, 1); // y cannot be 2 anymore
+        c.scp()[1].dom_mut().remove_value(&2, 1); // y cannot be 2 anymore
 
         assert_eq!(c.is_support(&vv), Truth::False);
+    }
+
+    #[test]
+    fn formula_constraint_check() {
+        let dom =   SetDom::new(vec![1, 2, 3, 4]);
+        let w =   Rc::new(ExVar::new("w".into(), dom));
+
+        // w == 3
+        let f = Rc::new(atom!(eq!(var!(w), cst!(3))));
+        let c = Intensional::new(vec![w], f);
+
+        let a = vec![vv(String::from("w"), 3)];
+        assert_eq!(c.check_assignment(&a), Truth::True);
+
+        let b = vec![vv(String::from("w"), 2)];
+        assert_eq!(c.check_assignment(&b), Truth::False);
     }
 }

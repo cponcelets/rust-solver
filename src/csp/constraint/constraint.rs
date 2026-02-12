@@ -2,7 +2,8 @@
 - Author: Clement Poncelet
 - Desc: Trait Constraint, API for intensional or extensional constraints
 - TODO: Refine what should be delegate to extensional implementation
-- TODO: Generalize apply
+- Optimization:
+    - HashSet for constraints scopes and extensional tables
 ***************************************/
 
 /**************************************
@@ -10,103 +11,54 @@
 ***************************************/
 use std::cmp::Ordering::Equal;
 use std::fmt;
-use std::ops::Deref;
+use std::fmt::Debug;
 use std::rc::Rc;
 use crate::csp::domain::setdom::{CartesianWalker};
-use crate::csp::domain::traits::{Domain, OrdT};
+use crate::csp::domain::domain::{Domain, OrdT};
 use crate::csp::truth::Truth;
 use crate::csp::variable::extvar::ExVar;
-use crate::csp::variable::vvalue::{make_assignment, VValue};
+use crate::csp::variable::vvalue::{make_assignment, vv, VValue};
 use crate::csp::csp::exists_extension;
 
-pub trait Constraint<T:OrdT> {
+pub trait Constraint<T:OrdT> : Debug {
+
+    //Trait : Methods to implement ---
+
     //Display trait implementation
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
-
-    /*
-    Operator semantics	    apply
-    Local satisfiability	check
-    Domain reasoning	    is_support
-    Consistency	            strict_support
-     */
-
-    //To implement ---
-    //operator semantics (still binary op)
-    fn apply(&self, x: &T, y: &T) -> bool;
+    //(operator semantics)
+    fn apply(&self, asn: &Vec<VValue<T>>) -> bool;
     //Scope, return the variable(s) implied by the constraint
     fn scp(&self) -> &[Rc<ExVar<T>>];
-    //To implement ---
 
-    //API: For using vvalue
-    fn check(&self, vvalue: &VValue<T>) -> Truth {
-        let (x, y) = (&self.scp()[0], &self.scp()[1]);
+    //Trait : Methods to implement --- END
 
-        if &vvalue.label == x.label() {
-            if y.valid_values().iter().any(|vy| self.apply(&vvalue.value, vy)) {
-                Truth::True
-            } else {
-                Truth::False
-            }
-        } else if &vvalue.label == y.label() {
-            if x.valid_values().iter().any(|vx| self.apply(vx, &vvalue.value)) {
-                Truth::True
-            } else {
-                Truth::False
-            }
+    //Constraint's label
+    //Generated with c_ and the variables' label in its scope
+    fn label(&self) -> String { format!("c_{}", self.scp().iter().map(|v| v.label())
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(""))}
+
+    // Is the v-value <x,v> accepted by the constraint:
+    // - Unknown, if out of scope
+    // - True, if the constraint can be satisfied (delegate to is_support_asn)
+    // - False otherwise
+    fn is_allowed(&self, vvalue: &VValue<T>) -> Truth {
+        if self.scp().iter().any( |v| v.label() == &vvalue.label) {
+            Truth::from(self.is_support_asn(&vec![vvalue.clone()], true))
         } else {
             Truth::Unknown
         }
     }
 
-    //Does <x,v> is accepted by the constraint
-    fn is_allowed(&self, vvalue: &VValue<T>) -> Truth {
-        match self.other_var(vvalue) {
-            Some(y) => {
-                let is_inverse = y.label() == self.scp()[0].label();
-                if y.valid_values().iter()
-                    .any(|w| if is_inverse {self.apply(w, &vvalue.value)} else {self.apply(&vvalue.value, w)})
-                {Truth::True} else {Truth::False}
-            }
-
-            None => Truth::Unknown
-        }
-    }
-
+    // Applies assignment with a scope check:
+    // - Unknown, if out of scope
+    // - True, False, output of applying the constraint
     fn check_assignment(&self, asn: &Vec<VValue<T>>) -> Truth {
-        //println!("{} < {}", asn.len(), self.scp().len());
         if asn.len() < self.scp().len() { Truth::Unknown }
-        else {
-            match (self.value_of(&self.scp()[0], asn), self.value_of(&self.scp()[1], asn)) {
-                (Some(a), Some(b)) => Truth::from(self.apply(a, b)),
-                _ => Truth::False, // assignment inconsistent with scope
-            }
-        }
+        else { Truth::from(self.apply(asn)) }
     }
-
-    /**** For k_ary (later)
-          fn assignment_map<'a>(&self, asn: &'a [VValue<T>]) -> HashMap<&'a String, &'a T> {
-          asn.iter().map(|vv| (&vv.label, &vv.value)).collect()
-          }
-
-          fn check_assignment(&self, asn: &Vec<VValue<T>>) -> Truth {
-          if asn.len() < self.scp().len() {
-              return Truth::Unknown;
-          }
-
-          let map = self.assignment_map(asn);
-
-          let mut values = Vec::new();
-
-          for var in self.scp() {
-              match map.get(var.label()) {
-                  Some(v) => values.push(*v),
-                  None => return Truth::False, // missing variable
-              }
-          }
-
-          Truth::from(self.apply_k(&values)) // apply_k = your k-ary predicate
-          }
-****/
 
     // From a v-value (x, a), returns:
     //- Truth::True if the v-value is valid for the corresponding variable's constraint
@@ -158,8 +110,8 @@ pub trait Constraint<T:OrdT> {
     }
 
     // From an assignment uses !cartesian product!, and returns:
-    //- Truth::True if asn is a support for the constraint,
-    //- false otherwise
+    //- True if asn is a support for the constraint,
+    //- False otherwise
     fn is_support_asn_rel(&self, asn: &Vec<VValue<T>>) -> Truth {
         // if assignment contradicts domain → invalid
         for vv in asn {
@@ -179,24 +131,27 @@ pub trait Constraint<T:OrdT> {
                 return Truth::True;
             }
         }
-
         Truth::False
     }
 
-    // From an assignment uses assignment's extension, and returns:
-    //- Truth::True if asn is a support for the constraint,
-    //- false otherwise
-    fn is_support_asn(&self, asn: &Vec<VValue<T>>) -> Truth {
-        // if assignment contradicts domain → invalid
-        for vv in asn {
-            if self.is_valid(vv) == Truth::False {
-                return Truth::False;
+    // From an assignment uses assignment's extension
+    // skip_valid is for mimicking is_allowed
+    // Returns:
+    // - True if asn is a support for the constraint,
+    // - False otherwise
+    fn is_support_asn(&self, asn: &Vec<VValue<T>>, skip_valid: bool) -> Truth {
+        if !skip_valid {
+            // if assignment contradicts domain → invalid
+            for vv in asn {
+                if self.is_valid(vv) == Truth::False {
+                    return Truth::False;
+                }
             }
-        }
 
-        // if assignment fully instantiates the constraint
-        if self.is_covered(asn) {
-            return self.check_assignment(asn);
+            // if assignment fully instantiates the constraint
+            if self.is_covered(asn) {
+                return self.check_assignment(asn);
+            }
         }
 
         // otherwise: ∃ extension that satisfies the constraint
@@ -238,7 +193,6 @@ pub trait Constraint<T:OrdT> {
         }
         Truth::False
     }
-    //API: For using vvalue
 
     //Return
     // - true if the constraint is always satisfied
@@ -264,7 +218,8 @@ pub trait Constraint<T:OrdT> {
         //extend to cartesian product for any cardinality
         for x in self.scp()[0].valid_values() {
             for y in self.scp()[1].valid_values() {
-                if self.apply(&x, &y) {
+                if self.apply(&vec![vv(self.scp()[0].label().clone(), x.clone()),
+                                    vv(self.scp()[1].label().clone(), y.clone())]) {
                     allowed += 1;
                 }
             }
@@ -282,7 +237,8 @@ pub trait Constraint<T:OrdT> {
         //extend to cartesian product for any cardinality
         for x in self.scp()[0].valid_values() {
             for y in self.scp()[1].valid_values() {
-                if !self.apply(&x, &y) {
+                if !self.apply(&vec![vv(self.scp()[0].label().clone(), x.clone()),
+                                     vv(self.scp()[1].label().clone(), y.clone())]) {
                     forbidden += 1;
                 }
             }
@@ -351,6 +307,6 @@ pub trait Constraint<T:OrdT> {
 
 impl<T:OrdT> fmt::Display for dyn Constraint<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.fmt(f)
+        Constraint::fmt(self, f)
     }
 }

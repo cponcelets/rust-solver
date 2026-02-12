@@ -32,7 +32,7 @@ pub fn make_assignment<T:OrdT>(scope: &[Rc<ExVar<T>>], values: Vec<T>)
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-use crate::csp::domain::traits::OrdT;
+use crate::csp::domain::domain::OrdT;
 use crate::csp::variable::extvar::ExVar;
 
 #[derive(Debug, Clone)]

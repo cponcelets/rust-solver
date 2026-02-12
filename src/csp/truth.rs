@@ -8,7 +8,7 @@
             Type Truth
 ***************************************/
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Truth {
     True,
     False,
@@ -33,6 +33,24 @@ impl Truth {
             Truth::True => Some(true),
             Truth::False => Some(false),
             Truth::Unknown => None,
+        }
+    }
+}
+
+impl Truth {
+    pub fn or(self, other: Truth) -> Truth {
+        match (self, other) {
+            (Truth::True, _)    | (_, Truth::True)      => Truth::True,
+            (Truth::Unknown, _) | (_, Truth::Unknown)   => Truth::Unknown,
+            _ => Truth::False,
+        }
+    }
+
+    pub fn and(self, other: Truth) -> Truth {
+        match (self, other) {
+            (Truth::False, _)   | (_, Truth::False)     => Truth::False,
+            (Truth::Unknown, _) | (_, Truth::Unknown)   => Truth::Unknown,
+            _ => Truth::True,
         }
     }
 }

@@ -3,25 +3,27 @@ use std::fmt;
 use std::rc::Rc;
 use petgraph::graph::UnGraph;
 use statrs::function::factorial::binomial;
-use crate::csp::constraint::traits::Constraint;
+use crate::csp::constraint::constraint::Constraint;
 use crate::csp::domain::setdom::CartesianWalker;
-use crate::csp::domain::traits::{Domain, OrdT};
+use crate::csp::domain::domain::{Domain, OrdT};
 use crate::csp::truth::Truth;
 use crate::csp::variable::extvar::ExVar;
 use crate::csp::variable::vvalue::{vv, VValue};
 
 pub struct Csp<T:OrdT> {
     vars : HashMap<String, Rc<ExVar<T>>>,
-    constraints : Vec<Box<dyn Constraint<T>>>
+    constraints : Vec<Rc<dyn Constraint<T>>>,
+    // -- for consistencies --
+    past : Vec<String>, //instantiated variables
 }
-//TODO: level, the current number of instantiated variables (also called `past variables`)
 
 impl<T:OrdT> Csp<T> {
-    pub fn new (v: HashMap<String, Rc<ExVar<T>>>, c: Vec<Box<dyn Constraint<T>>>) -> Csp<T> {
-        Csp { vars: v, constraints: c }
+    pub fn new (v: HashMap<String, Rc<ExVar<T>>>, c: Vec<Rc<dyn Constraint<T>>>) -> Csp<T> {
+        Csp { vars: v, constraints: c, past : Vec::new() }
     }
 
-    pub fn constraints(&self) -> &Vec<Box<dyn Constraint<T>>> {&self.constraints}
+    pub fn constraints(&self) -> &Vec<Rc<dyn Constraint<T>>> {&self.constraints}
+    pub fn vars(&self) -> &HashMap<String, Rc<ExVar<T>>> {&self.vars}
 
     pub fn cover(&self, asn: &Vec<VValue<T>>) -> Vec<&dyn Constraint<T>> {
         self.constraints
@@ -188,6 +190,11 @@ impl<T:OrdT> Csp<T> {
         }
         g
     }
+
+    //--- --- ------ --- ------ --- ------ --- ---
+    pub fn past(&self) -> &Vec<String> {&self.past}
+    pub fn level(&self) -> usize {self.past.len()}
+
 }
 
 impl<'a, T:OrdT> fmt::Display for Csp<T> {
@@ -232,33 +239,42 @@ pub fn exists_extension<T: OrdT>(asn: &[VValue<T>], missing_vars: &Vec<Rc<ExVar<
 
 #[cfg(test)]
 mod tests {
+use crate::csp::ast::expr::Expr;
+use crate::csp::ast::pred::Pred;
+use crate::csp::ast::formula::Formula;
 use std::collections::HashMap;
     use std::rc::Rc;
     use petgraph::dot::Dot;
-    use crate::{dom, var};
-    use crate::csp::constraint::intensional::{EqConstraint, LtConstraint, NeqConstraint};
+    use crate::{atom, dom, eq, lt, neq, var, var_dom};
+    use crate::csp::constraint::intensional::Intensional;
     use crate::csp::csp::Csp;
     use crate::csp::domain::setdom::SetDom;
-    use crate::csp::domain::traits::OrdT;
+    use crate::csp::domain::domain::OrdT;
     use crate::csp::variable::extvar::{generate_variables, ExVar};
     use crate::csp::variable::vvalue::{vv, VValue};
 
     fn setup_csp<'a, T: OrdT>() -> (Csp<i32>, Rc<ExVar<i32>>, Rc<ExVar<i32>>, Rc<ExVar<i32>>) {
         let dom = SetDom::new(vec![1, 2]);
 
-        let x = var!("x".into(), dom.clone());
-        let y = var!("y".into(), dom.clone());
-        let z = var!("z".into(), dom);
+        let x = var_dom!("x".into(), dom.clone());
+        let y = var_dom!("y".into(), dom.clone());
+        let z = var_dom!("z".into(), dom);
         let mut vmap = HashMap::new();
         vmap.insert("x".into(), x.clone());
         vmap.insert("y".into(), y.clone());
         vmap.insert("z".into(), z.clone());
 
-        let c1 = EqConstraint::new(x.clone(), y.clone());
-        let c2 = LtConstraint::new(y.clone(), z.clone());
-        let c3 = LtConstraint::new(x.clone(), z.clone());
+        // x == y
+        let f1 = Rc::new(atom!(eq!(var!(x), var!(y))));
+        let c1 = Intensional::new(vec![x.clone(),y.clone()], f1);
+        // y < z
+        let f2 = Rc::new(atom!(lt!(var!(y), var!(z))));
+        let c2 = Intensional::new(vec![y.clone(),z.clone()], f2);
+        // x < z
+        let f3 = Rc::new(atom!(lt!(var!(x), var!(z))));
+        let c3 = Intensional::new(vec![x.clone(),z.clone()], f3);
 
-        let csp = Csp::new(vmap,vec![Box::new(c1), Box::new(c2), Box::new(c3)]);
+        let csp = Csp::new(vmap,vec![Rc::new(c1), Rc::new(c2), Rc::new(c3)]);
         (csp, x, y, z)
     }
 
@@ -268,32 +284,32 @@ use std::collections::HashMap;
         let vmap = generate_variables("x", 9, &dom_color);
         let p_init = Csp::new(vmap.clone(),
                                    {vec![
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x1")).unwrap().clone(), vmap.get(&String::from("x3")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x1")).unwrap().clone(), vmap.get(&String::from("x4")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x1")).unwrap().clone(), vmap.get(&String::from("x7")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x1")).unwrap().clone(), vmap.get(&String::from("x2")).unwrap().clone())),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x1")).unwrap().clone()), var!(vmap.get(&String::from("x3")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x1")).unwrap().clone()), var!(vmap.get(&String::from("x4")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x1")).unwrap().clone()), var!(vmap.get(&String::from("x7")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x1")).unwrap().clone()), var!(vmap.get(&String::from("x2")).unwrap().clone())))),
 
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x2")).unwrap().clone(), vmap.get(&String::from("x7")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x2")).unwrap().clone(), vmap.get(&String::from("x8")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x2")).unwrap().clone(), vmap.get(&String::from("x9")).unwrap().clone())),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x2")).unwrap().clone()), var!(vmap.get(&String::from("x7")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x2")).unwrap().clone()), var!(vmap.get(&String::from("x8")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x2")).unwrap().clone()), var!(vmap.get(&String::from("x9")).unwrap().clone())))),
 
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x3")).unwrap().clone(), vmap.get(&String::from("x4")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x3")).unwrap().clone(), vmap.get(&String::from("x5")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x3")).unwrap().clone(), vmap.get(&String::from("x6")).unwrap().clone())),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x3")).unwrap().clone()), var!(vmap.get(&String::from("x4")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x3")).unwrap().clone()), var!(vmap.get(&String::from("x5")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x3")).unwrap().clone()), var!(vmap.get(&String::from("x6")).unwrap().clone())))),
 
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x4")).unwrap().clone(), vmap.get(&String::from("x5")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x4")).unwrap().clone(), vmap.get(&String::from("x7")).unwrap().clone())),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x4")).unwrap().clone()), var!(vmap.get(&String::from("x5")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x4")).unwrap().clone()), var!(vmap.get(&String::from("x7")).unwrap().clone())))),
 
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x5")).unwrap().clone(), vmap.get(&String::from("x6")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x5")).unwrap().clone(), vmap.get(&String::from("x7")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x5")).unwrap().clone(), vmap.get(&String::from("x8")).unwrap().clone())),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x5")).unwrap().clone()), var!(vmap.get(&String::from("x6")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x5")).unwrap().clone()), var!(vmap.get(&String::from("x7")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x5")).unwrap().clone()), var!(vmap.get(&String::from("x8")).unwrap().clone())))),
 
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x6")).unwrap().clone(), vmap.get(&String::from("x8")).unwrap().clone())),
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x6")).unwrap().clone(), vmap.get(&String::from("x9")).unwrap().clone())),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x6")).unwrap().clone()), var!(vmap.get(&String::from("x8")).unwrap().clone())))),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x6")).unwrap().clone()), var!(vmap.get(&String::from("x9")).unwrap().clone())))),
 
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x7")).unwrap().clone(), vmap.get(&String::from("x8")).unwrap().clone())),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x7")).unwrap().clone()), var!(vmap.get(&String::from("x8")).unwrap().clone())))),
 
-                                       Box::new(NeqConstraint::new(vmap.get(&String::from("x8")).unwrap().clone(), vmap.get(&String::from("x9")).unwrap().clone())),
+                                       Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x8")).unwrap().clone()), var!(vmap.get(&String::from("x9")).unwrap().clone())))),
                                    ]}
         );
 
@@ -316,35 +332,35 @@ use std::collections::HashMap;
     fn normalized_csp() {
         let dom = dom![1, 2];
 
-        let x = var!("x".into(), dom.clone());
-        let y = var!("y".into(), dom.clone());
-        let z = var!("z".into(), dom);
+        let x = var_dom!("x".into(), dom.clone());
+        let y = var_dom!("y".into(), dom.clone());
+        let z = var_dom!("z".into(), dom);
         let mut vmap = HashMap::new();
         vmap.insert("x".into(), x.clone());
         vmap.insert("y".into(), y.clone());
         vmap.insert("z".into(), z.clone());
 
-        let c1 = EqConstraint::new(x.clone(), y.clone());
-        let c2 = LtConstraint::new(y.clone(), z.clone());
+        let c1 = Intensional::from_pred(eq!(var!(x), var!(y)));
+        let c2 = Intensional::from_pred(lt!(var!(x), var!(y)));
 
-        let csp = Csp::new(vmap,vec![Box::new(c1), Box::new(c2)]);
-        assert!(csp.is_normalized());
+        let csp = Csp::new(vmap,vec![Rc::new(c1), Rc::new(c2)]);
+        assert!(!csp.is_normalized());
     }
 
     #[test]
     fn non_normalized_same_scope() {
         let dom = dom![1, 2];
 
-        let x = var!("x".into(), dom.clone());
-        let y = var!("y".into(), dom);
+        let x = var_dom!("x".into(), dom.clone());
+        let y = var_dom!("y".into(), dom);
         let mut vmap = HashMap::new();
         vmap.insert("x".into(), x.clone());
         vmap.insert("y".into(), y.clone());
 
-        let c1 = EqConstraint::new(x.clone(), y.clone());
-        let c2 = NeqConstraint::new(x.clone(), y.clone());
+        let c1 = Intensional::from_pred(eq!(var!(x), var!(y)));
+        let c2 = Intensional::from_pred(neq!(var!(x), var!(y)));
 
-        let csp = Csp::new(vmap, vec![Box::new(c1), Box::new(c2)]);
+        let csp = Csp::new(vmap, vec![Rc::new(c1), Rc::new(c2)]);
         assert!(!csp.is_normalized());
     }
 
@@ -352,16 +368,16 @@ use std::collections::HashMap;
     fn non_normalized_scope_order_irrelevant() {
         let dom = dom![1, 2];
 
-        let x = var!("x".into(), dom.clone());
-        let y = var!("y".into(), dom);
+        let x = var_dom!("x".into(), dom.clone());
+        let y = var_dom!("y".into(), dom);
         let mut vmap = HashMap::new();
         vmap.insert("x".into(), x.clone());
         vmap.insert("y".into(), y.clone());
 
-        let c1 = EqConstraint::new(x.clone(), y.clone());
-        let c2 = LtConstraint::new(y.clone(), x.clone());
+        let c1 = Intensional::from_pred(eq!(var!(x), var!(y)));
+        let c2 = Intensional::from_pred(lt!(var!(y), var!(x)));
 
-        let csp = Csp::new(vmap, vec![Box::new(c1), Box::new(c2)]);
+        let csp = Csp::new(vmap, vec![Rc::new(c1), Rc::new(c2)]);
         assert!(!csp.is_normalized());
     }
 
@@ -369,18 +385,18 @@ use std::collections::HashMap;
     fn hypergraph_density_binary() {
         let dom = dom![1, 2];
 
-        let x = var!(String::from("x"), dom.clone());
-        let y = var!(String::from("y"), dom.clone());
-        let z = var!(String::from("z"), dom);
+        let x = var_dom!(String::from("x"), dom.clone());
+        let y = var_dom!(String::from("y"), dom.clone());
+        let z = var_dom!(String::from("z"), dom);
         let mut vmap = HashMap::new();
         vmap.insert("x".into(), x.clone());
         vmap.insert("y".into(), y.clone());
         vmap.insert("z".into(), z.clone());
 
-        let c1 = EqConstraint::new(x.clone(), y.clone());
-        let c2 = NeqConstraint::new(y.clone(), z.clone());
+        let c1 = Intensional::from_pred(eq!(var!(x), var!(y)));
+        let c2 = Intensional::from_pred(neq!(var!(y), var!(z)));
 
-        let csp = Csp::new(vmap, vec![Box::new(c1), Box::new(c2)]);
+        let csp = Csp::new(vmap, vec![Rc::new(c1), Rc::new(c2)]);
         let d = csp.density();
 
         let expected = 2.0 / 3.0;

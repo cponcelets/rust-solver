@@ -1,10 +1,13 @@
+use rust_solver::csp::ast::expr::{Expr};
+use rust_solver::csp::ast::pred::Pred;
 use std::collections::HashMap;
 use std::rc::Rc;
 use petgraph::dot::Dot;
 use rust_solver::csp::csp::Csp;
 use rust_solver::csp::prelude::setdom::SetDom;
 use rust_solver::csp::prelude::extvar::{generate_variables, ExVar};
-use rust_solver::csp::prelude::intensional::{EqConstraint, LtConstraint, NeqConstraint};
+use rust_solver::csp::constraint::intensional::Intensional;
+use rust_solver::{eq, lt, neq, var};
 
 #[test]
 fn test_graphs() {
@@ -16,11 +19,11 @@ fn test_graphs() {
     ]);
 
     let p_init = Csp::new(vmap.clone(),
-                                            {vec![
-                                                Box::new(EqConstraint::new(vmap.get(&String::from("x")).unwrap().clone(), vmap.get(&String::from("y")).unwrap().clone())),
-                                                Box::new(LtConstraint::new(vmap.get(&String::from("x")).unwrap().clone(), vmap.get(&String::from("z")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x")).unwrap().clone(), vmap.get(&String::from("z")).unwrap().clone()))
-                               ]}
+                          {vec![
+                              Rc::new(Intensional::from_pred(eq!(var!(vmap.get(&String::from("x")).unwrap().clone()), var!(vmap.get(&String::from("y")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(lt!(var!(vmap.get(&String::from("x")).unwrap().clone()), var!(vmap.get(&String::from("z")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x")).unwrap().clone()), var!(vmap.get(&String::from("z")).unwrap().clone()))))
+                          ]}
     );
 
     //For a given constraint network $P$ , we denote by:
@@ -55,34 +58,34 @@ fn test_graph_color() {
     let dom_color = SetDom::new(vec!["dg", "mg", "lg", "w"]);
     let vmap = generate_variables("x", 9, &dom_color);
     let p_init = Csp::new(vmap.clone(),
-                                            {vec![
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x1")).unwrap().clone(), vmap.get(&String::from("x3")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x1")).unwrap().clone(), vmap.get(&String::from("x4")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x1")).unwrap().clone(), vmap.get(&String::from("x7")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x1")).unwrap().clone(), vmap.get(&String::from("x2")).unwrap().clone())),
+                          {vec![
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x1")).unwrap().clone()), var!(vmap.get(&String::from("x3")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x1")).unwrap().clone()), var!(vmap.get(&String::from("x4")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x1")).unwrap().clone()), var!(vmap.get(&String::from("x7")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x1")).unwrap().clone()), var!(vmap.get(&String::from("x2")).unwrap().clone())))),
 
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x2")).unwrap().clone(), vmap.get(&String::from("x7")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x2")).unwrap().clone(), vmap.get(&String::from("x8")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x2")).unwrap().clone(), vmap.get(&String::from("x9")).unwrap().clone())),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x2")).unwrap().clone()), var!(vmap.get(&String::from("x7")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x2")).unwrap().clone()), var!(vmap.get(&String::from("x8")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x2")).unwrap().clone()), var!(vmap.get(&String::from("x9")).unwrap().clone())))),
 
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x3")).unwrap().clone(), vmap.get(&String::from("x4")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x3")).unwrap().clone(), vmap.get(&String::from("x5")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x3")).unwrap().clone(), vmap.get(&String::from("x6")).unwrap().clone())),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x3")).unwrap().clone()), var!(vmap.get(&String::from("x4")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x3")).unwrap().clone()), var!(vmap.get(&String::from("x5")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x3")).unwrap().clone()), var!(vmap.get(&String::from("x6")).unwrap().clone())))),
 
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x4")).unwrap().clone(), vmap.get(&String::from("x5")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x4")).unwrap().clone(), vmap.get(&String::from("x7")).unwrap().clone())),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x4")).unwrap().clone()), var!(vmap.get(&String::from("x5")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x4")).unwrap().clone()), var!(vmap.get(&String::from("x7")).unwrap().clone())))),
 
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x5")).unwrap().clone(), vmap.get(&String::from("x6")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x5")).unwrap().clone(), vmap.get(&String::from("x7")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x5")).unwrap().clone(), vmap.get(&String::from("x8")).unwrap().clone())),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x5")).unwrap().clone()), var!(vmap.get(&String::from("x6")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x5")).unwrap().clone()), var!(vmap.get(&String::from("x7")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x5")).unwrap().clone()), var!(vmap.get(&String::from("x8")).unwrap().clone())))),
 
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x6")).unwrap().clone(), vmap.get(&String::from("x8")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x6")).unwrap().clone(), vmap.get(&String::from("x9")).unwrap().clone())),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x6")).unwrap().clone()), var!(vmap.get(&String::from("x8")).unwrap().clone())))),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x6")).unwrap().clone()), var!(vmap.get(&String::from("x9")).unwrap().clone())))),
 
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x7")).unwrap().clone(), vmap.get(&String::from("x8")).unwrap().clone())),
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x7")).unwrap().clone()), var!(vmap.get(&String::from("x8")).unwrap().clone())))),
 
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("x8")).unwrap().clone(), vmap.get(&String::from("x9")).unwrap().clone())),
-                               ]}
+                              Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("x8")).unwrap().clone()), var!(vmap.get(&String::from("x9")).unwrap().clone())))),
+                          ]}
     );
 
     println!("{}", p_init);

@@ -1,14 +1,16 @@
+use rust_solver::csp::ast::expr::Expr;
+use rust_solver::csp::ast::pred::Pred;
 use crate::extvar::ExVar;
 use std::collections::HashMap;
 use std::rc::Rc;
-use rust_solver::csp::constraint::traits::Constraint;
+use rust_solver::csp::constraint::intensional::Intensional;
+use rust_solver::csp::constraint::constraint::Constraint;
 use rust_solver::csp::csp::Csp;
 use rust_solver::csp::prelude::*;
 use rust_solver::csp::domain::setdom::{SetDom};
-use rust_solver::csp::domain::traits::Domain;
-use rust_solver::csp::prelude::intensional::{EqConstraint, LtConstraint, NeqConstraint};
+use rust_solver::csp::domain::domain::Domain;
 use rust_solver::csp::prelude::vvalue::vv;
-use rust_solver::var;
+use rust_solver::{eq, lt, neq, var, var_dom};
 
 #[test]
 fn test_lc_and_solution() { //Book's Example
@@ -22,9 +24,9 @@ fn test_lc_and_solution() { //Book's Example
 
     let p_init = Csp::new(vmap.clone(),
                                             {vec![
-                                                Box::new(EqConstraint::new(vmap.get(&String::from("x")).unwrap().clone(), vmap.get(&String::from("y")).unwrap().clone())),
-                                                Box::new(LtConstraint::new(vmap.get(&String::from("x")).unwrap().clone(), vmap.get(&String::from("z")).unwrap().clone())),
-                                                Box::new(NeqConstraint::new(vmap.get(&String::from("y")).unwrap().clone(), vmap.get(&String::from("z")).unwrap().clone()))
+                                                Rc::new(Intensional::from_pred(eq!(var!(vmap.get(&String::from("x")).unwrap().clone()), var!(vmap.get(&String::from("y")).unwrap().clone())))),
+                                                Rc::new(Intensional::from_pred(lt!(var!(vmap.get(&String::from("x")).unwrap().clone()), var!(vmap.get(&String::from("z")).unwrap().clone())))),
+                                                Rc::new(Intensional::from_pred(neq!(var!(vmap.get(&String::from("y")).unwrap().clone()), var!(vmap.get(&String::from("z")).unwrap().clone()))))
                                             ]}
     );
 
@@ -32,33 +34,33 @@ fn test_lc_and_solution() { //Book's Example
     //{(x,1),(y,0)}     not locally consistent (cover Cxy but not satisfied)
     let ixy = vec![vv(String::from("x"), 1), vv(String::from("y"), 0)];
     assert_eq!(p_init.is_locally_consistent(&ixy), Truth::False);
-    assert_eq!(p_init.constraints()[0].is_support_asn(&ixy), p_init.constraints()[0].is_support_asn_rel(&ixy));
-    assert_eq!(p_init.constraints()[0].is_support_asn(&ixy), Truth::False);
+    assert_eq!(p_init.constraints()[0].is_support_asn(&ixy, false), p_init.constraints()[0].is_support_asn_rel(&ixy));
+    assert_eq!(p_init.constraints()[0].is_support_asn(&ixy, false), Truth::False);
     //Then
     assert_eq!(p_init.is_solution(&ixy), Truth::False);
 
     let ixy_lc = vec![vv(String::from("x"), 1), vv(String::from("y"), 1)];
     assert_eq!(p_init.is_locally_consistent(&ixy_lc), Truth::True);
-    assert_eq!(p_init.constraints()[0].is_support_asn(&ixy_lc), p_init.constraints()[0].is_support_asn_rel(&ixy_lc));
-    assert_eq!(p_init.constraints()[0].is_support_asn(&ixy_lc), Truth::True);
+    assert_eq!(p_init.constraints()[0].is_support_asn(&ixy_lc, false), p_init.constraints()[0].is_support_asn_rel(&ixy_lc));
+    assert_eq!(p_init.constraints()[0].is_support_asn(&ixy_lc, false), Truth::True);
     //Then
     assert_eq!(p_init.is_solution(&ixy_lc), Truth::False);
 
     let ixyz = vec![vv(String::from("x"), 1), vv(String::from("y"), 1), vv(String::from("z"), 0)];
     assert_eq!(p_init.is_locally_consistent(&ixyz), Truth::False);
-    assert_eq!(p_init.constraints()[1].is_support_asn(&ixyz), p_init.constraints()[1].is_support_asn_rel(&ixyz));
-    assert_eq!(p_init.constraints()[1].is_support_asn(&ixyz), Truth::False);
+    assert_eq!(p_init.constraints()[1].is_support_asn(&ixyz, false), p_init.constraints()[1].is_support_asn_rel(&ixyz));
+    assert_eq!(p_init.constraints()[1].is_support_asn(&ixyz, false), Truth::False);
     //Then
     assert_eq!(p_init.is_solution(&ixyz), Truth::False);
 
     let ixyz_lc = vec![vv(String::from("x"), 1), vv(String::from("y"), 1), vv(String::from("z"), 2)];
     assert_eq!(p_init.is_locally_consistent(&ixyz_lc), Truth::True);
-    assert_eq!(p_init.constraints()[0].is_support_asn(&ixyz_lc), p_init.constraints()[0].is_support_asn_rel(&ixyz_lc));
-    assert_eq!(p_init.constraints()[0].is_support_asn(&ixyz_lc), Truth::True);
-    assert_eq!(p_init.constraints()[1].is_support_asn(&ixyz_lc), p_init.constraints()[1].is_support_asn_rel(&ixyz_lc));
-    assert_eq!(p_init.constraints()[1].is_support_asn(&ixyz_lc), Truth::True);
-    assert_eq!(p_init.constraints()[2].is_support_asn(&ixyz_lc), p_init.constraints()[2].is_support_asn_rel(&ixyz_lc));
-    assert_eq!(p_init.constraints()[2].is_support_asn(&ixyz_lc), Truth::True);
+    assert_eq!(p_init.constraints()[0].is_support_asn(&ixyz_lc, false), p_init.constraints()[0].is_support_asn_rel(&ixyz_lc));
+    assert_eq!(p_init.constraints()[0].is_support_asn(&ixyz_lc, false), Truth::True);
+    assert_eq!(p_init.constraints()[1].is_support_asn(&ixyz_lc, false), p_init.constraints()[1].is_support_asn_rel(&ixyz_lc));
+    assert_eq!(p_init.constraints()[1].is_support_asn(&ixyz_lc, false), Truth::True);
+    assert_eq!(p_init.constraints()[2].is_support_asn(&ixyz_lc, false), p_init.constraints()[2].is_support_asn_rel(&ixyz_lc));
+    assert_eq!(p_init.constraints()[2].is_support_asn(&ixyz_lc, false), Truth::True);
     //Then
     assert_eq!(p_init.is_solution(&ixyz_lc), Truth::True);
 
@@ -79,18 +81,20 @@ fn test_lc_and_solution() { //Book's Example
 fn small_csp() -> Csp<i32> {
     let dom = SetDom::new(vec![1,2]);
 
-    let x = var!("x".into(), dom.snapshot());
-    let y = var!("y".into(), dom.snapshot());
-    let z = var!("z".into(), dom.snapshot());
+    let x = var_dom!("x".into(), dom.snapshot());
+    let y = var_dom!("y".into(), dom.snapshot());
+    let z = var_dom!("z".into(), dom.snapshot());
     let mut vmap = HashMap::new();
     vmap.insert("x".into(), x.clone());
     vmap.insert("y".into(), y.clone());
     vmap.insert("z".into(), z.clone());
 
-    let c1 = EqConstraint::new(x.clone(), y.clone()); // x = y
-    let c2 = LtConstraint::new(y.clone(), z.clone()); // y < z
+    // x = y
+    let c1 = Intensional::from_pred(eq!(var!(x), var!(y)));
+    // y < z
+    let c2 = Intensional::from_pred(lt!(var!(y), var!(z)));
 
-    Csp::new(vmap, vec![Box::new(c1), Box::new(c2)])
+    Csp::new(vmap, vec![Rc::new(c1), Rc::new(c2)])
 }
 
 #[test]
@@ -129,9 +133,9 @@ fn rel_matches_support() {
 #[test]
 fn trailing_preserves_consistency() {
     let dom = SetDom::new(vec![1,2]);
-    let x = var!("x".into(), dom.snapshot());
-    let y = var!("y".into(), dom.snapshot());
-    let c = EqConstraint::new(x.clone(), y.clone());
+    let x = var_dom!("x".into(), dom.snapshot());
+    let y = var_dom!("y".into(), dom.snapshot());
+    let c = Intensional::from_pred(eq!(var!(x), var!(y)));
 
     assert_eq!(c.is_support(&vv("x".into(), 1)), Truth::True);
 

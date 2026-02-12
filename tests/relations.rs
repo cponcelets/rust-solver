@@ -1,19 +1,21 @@
+use rust_solver::csp::ast::expr::Expr;
+use rust_solver::csp::ast::pred::Pred;
 use rust_solver::csp::prelude::extvar::ExVar;
 use std::rc::Rc;
-use rust_solver::csp::constraint::traits::Constraint;
-use rust_solver::csp::domain::traits::Domain;
+use rust_solver::csp::constraint::constraint::Constraint;
+use rust_solver::csp::domain::domain::Domain;
 use rust_solver::csp::prelude::setdom::SetDom;
-use rust_solver::csp::prelude::intensional::{EqConstraint, LtConstraint, NeqConstraint};
+use rust_solver::csp::constraint::intensional::Intensional;
 use rust_solver::csp::prelude::vvalue::VValue;
-use rust_solver::var;
+use rust_solver::{eq, lt, neq, var, var_dom};
 
 #[test]
 fn eq_constraint_rel() {
     let dom_int = SetDom::new(vec![1, 2, 3]);
-    let x = var!(String::from("x"), Clone::clone(&dom_int));
-    let y = var!(String::from("y"), dom_int);
+    let x = var_dom!(String::from("x"), dom_int.snapshot());
+    let y = var_dom!(String::from("y"), dom_int);
 
-    let c = EqConstraint::new(x.clone(), y.clone());
+    let c = Intensional::from_pred(eq!(var!(x), var!(y)));
     let rel = c.rel();
 
     //println!("{:?}", rel);
@@ -25,10 +27,10 @@ fn eq_constraint_rel() {
 #[test]
 fn lt_constraint_rel() {
     let dom_int = SetDom::new(vec![1, 2, 3]);
-    let x = var!(String::from("x"), Clone::clone(&dom_int));
-    let y = var!(String::from("y"), dom_int);
+    let x = var_dom!(String::from("x"), dom_int.snapshot());
+    let y = var_dom!(String::from("y"), dom_int);
 
-    let c = LtConstraint::new(x.clone(), y.clone());
+    let c = Intensional::from_pred(lt!(var!(x), var!(y)));
     let rel = c.rel();
 
     //println!("{:?}", rel);
@@ -40,10 +42,10 @@ fn lt_constraint_rel() {
 #[test]
 fn neq_constraint_rel() {
     let dom_int = SetDom::new(vec!["dg", "mg", "lg", "w"]);
-    let x = var!(String::from("x"), Clone::clone(&dom_int));
-    let y = var!(String::from("y"), dom_int);
+    let x = var_dom!(String::from("x"), dom_int.snapshot());
+    let y = var_dom!(String::from("y"), dom_int);
 
-    let c = NeqConstraint::new(x.clone(), y.clone());
+    let c = Intensional::from_pred(neq!(var!(x), var!(y)));
     let rel = c.rel();
 
     println!("{:?}", rel);
@@ -57,9 +59,9 @@ fn cartesian_respects_trailing() {
     let mut d = SetDom::new(vec![1,2]);
     d.remove_value(&2, 1);
 
-    let x = var!("x".into(), Clone::clone(&d));
-    let y = var!("y".into(), Clone::clone(&d));
-    let c = EqConstraint::new(x, y);
+    let x = var_dom!("x".into(), Clone::clone(&d));
+    let y = var_dom!("y".into(), Clone::clone(&d));
+    let c = Intensional::from_pred(eq!(var!(x), var!(y)));
     let rel = c.rel();
 
     assert_eq!(rel.len(), 1);

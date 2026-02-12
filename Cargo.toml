@@ -10,3 +10,4 @@ authors = ["Clément Poncelet Sanchez"]
 [dependencies]
 petgraph = "0.8.3"
 statrs = "0.18.0"
+vv = "0.2.0"

@@ -1,6 +1,6 @@
 /**************************************
 - Author: Clement Poncelet
-- Desc: Extensional Constraints, list of allowed tuples
+- Desc: Extensional Constraints, list of allowed tuples (rel)
 ***************************************/
 
 /**************************************
@@ -8,14 +8,15 @@
 ***************************************/
 use std::fmt;
 use std::rc::Rc;
-use crate::csp::constraint::traits::Constraint;
-use crate::csp::domain::traits::OrdT;
+use crate::csp::constraint::constraint::Constraint;
+use crate::csp::domain::domain::OrdT;
 use crate::csp::truth::Truth;
 use crate::csp::variable::extvar::ExVar;
-use crate::csp::variable::vvalue::{vv, VValue};
+use crate::csp::variable::vvalue::{VValue};
 
+#[derive(Debug)]
 pub struct ExtConstraint<T: OrdT> {
-    scope: Vec<Rc<ExVar<T>>>, //HashSet<Vec<VValue<T>>>
+    scope: Vec<Rc<ExVar<T>>>,
     allowed: Vec<Vec<VValue<T>>>,
 }
 
@@ -63,8 +64,8 @@ impl<T: OrdT> Constraint<T> for ExtConstraint<T> {
     fn rel(&self) -> Vec<Vec<VValue<T>>> { self.allowed.clone()}
     //---- Overriding -----------
 
-    fn apply(&self, x: &T, y: &T) -> bool {
-        if self.check_assignment(&vec![vv(String::from("x"), x.clone()), vv(String::from("y"), y.clone())]) == Truth::True { true }
+    fn apply(&self, asn: &Vec<VValue<T>>) -> bool {
+        if self.check_assignment(asn) == Truth::True { true }
         else {false}
     }
 
@@ -81,7 +82,7 @@ mod tests {
     use crate::csp::prelude::extensional::VValue;
 use std::rc::Rc;
     use crate::csp::constraint::extensional::ExtConstraint;
-    use crate::csp::constraint::traits::Constraint;
+    use crate::csp::constraint::constraint::Constraint;
     use crate::csp::domain::setdom::SetDom;
     use crate::csp::truth::Truth;
     use crate::csp::variable::extvar::ExVar;

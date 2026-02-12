@@ -13,11 +13,13 @@
 use crate::csp::domain::setdom::SetDomIter;
 
 pub trait OrdT:
-Clone + std::fmt::Display + Eq + Ord + std::hash::Hash {}
+Clone + std::fmt::Debug + std::fmt::Display + Eq + Ord + std::hash::Hash
+{}
 
 impl<T> OrdT for T
 where
-    T:Clone + std::fmt::Display + Eq + Ord + std::hash::Hash {}
+    T:Clone + std::fmt::Debug + std::fmt::Display + Eq + Ord + std::hash::Hash
+{}
 
 /**************************************
             Domain

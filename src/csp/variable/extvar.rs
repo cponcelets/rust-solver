@@ -14,7 +14,7 @@ pub fn generate_variables<T:OrdT>(base_name: &str, n:usize, dom : &SetDom<T>) ->
     for i in 1..n+1 {
         vmap.insert(
             String::from(base_name.to_owned() + &*i.to_string()),
-            var!(String::from(base_name.to_owned() + &*i.to_string()), Clone::clone(&dom))
+            var_dom!(String::from(base_name.to_owned() + &*i.to_string()), Clone::clone(&dom))
         );
     }
     vmap
@@ -26,15 +26,32 @@ pub fn generate_variables<T:OrdT>(base_name: &str, n:usize, dom : &SetDom<T>) ->
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use crate::csp::domain::setdom::SetDom;
-use crate::csp::domain::traits::{Domain, OrdT};
-use crate::var;
+use crate::csp::domain::domain::{Domain, OrdT};
+use crate::{var_dom};
 
+#[derive(Debug)]
 pub struct ExVar<T:OrdT> {
     label: String,
     dom:  Rc<RefCell<SetDom<T>>>
 }
+
+impl<T: OrdT> PartialEq for ExVar<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.label() == other.label()
+    }
+}
+
+impl<T: OrdT> Eq for ExVar<T> {}
+
+impl<T: OrdT> Hash for ExVar<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.label().hash(state);
+    }
+}
+
 
 impl<T:OrdT> ExVar<T> {
     pub fn new (label: String, dom: SetDom<T>) -> ExVar<T> {
@@ -61,7 +78,7 @@ impl<T:OrdT> ExVar<T> {
 
 impl<T:OrdT> fmt::Display for ExVar<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} : {}", self.label, self.dom())
+        write!(f, "{} : {:?}", self.label, self.dom().active_values())
     }
 }
 
@@ -72,7 +89,7 @@ impl<T:OrdT> fmt::Display for ExVar<T> {
 #[cfg(test)]
 mod tests {
     use std::ops::Deref;
-    use crate::csp::domain::traits::Domain;
+    use crate::csp::domain::domain::Domain;
     use crate::csp::variable::extvar::SetDom;
     use crate::csp::variable::extvar::ExVar;
 
