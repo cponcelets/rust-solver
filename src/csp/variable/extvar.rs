@@ -52,7 +52,6 @@ impl<T: OrdT> Hash for ExVar<T> {
     }
 }
 
-
 impl<T:OrdT> ExVar<T> {
     pub fn new (label: String, dom: SetDom<T>) -> ExVar<T> {
         let ref_dom = Rc::new(RefCell::new(dom));
@@ -61,6 +60,14 @@ impl<T:OrdT> ExVar<T> {
             dom: ref_dom
         }
     }
+
+    pub fn deep_clone(&self) -> Self {
+        Self {
+            label: self.label.clone(),
+            dom: Rc::new(RefCell::new(self.dom().snapshot())),
+        }
+    }
+
     pub fn value(&self) -> Option<T> {
         if self.dom().size() > 1  {None}
         else {Some(self.dom().active_values().get(0).unwrap().clone())}

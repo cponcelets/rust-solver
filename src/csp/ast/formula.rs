@@ -55,9 +55,9 @@ pub fn print_formula<E:Eval>(f: &Formula<E>)-> String {
         Formula::Atom(p)           => print_predicate(p),
         Formula::Not(f)     => "! ".to_owned() + &*print_formula(f),
         Formula::Or(fs)
-        => fs.iter().map(|op| "|| ".to_owned() + &*print_formula(op)).collect(),
+        => format!("{}", fs.iter().map(|cl| print_formula(cl)).collect::<Vec<_>>().join(" || ")),
         Formula::And(fs)
-        => fs.iter().map(|op| "&& ".to_owned() + &*print_formula(op)).collect(),
+        => format!("{}", fs.iter().map(|cl| print_formula(cl)).collect::<Vec<_>>().join(" && "))
     }
 }
 

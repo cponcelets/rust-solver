@@ -4,11 +4,6 @@
 ***************************************/
 
 /**************************************
-              Factory
-***************************************/
-
-
-/**************************************
    Formula (Intensional Constraints)
 ***************************************/
 use std::collections::HashSet;
@@ -23,9 +18,10 @@ use crate::csp::constraint::constraint::Constraint;
 use crate::csp::domain::domain::OrdT;
 use crate::csp::variable::extvar::ExVar;
 use crate::csp::variable::vvalue::VValue;
+
 pub struct Intensional<T:OrdT, E:Eval> {
     scope:      Vec<Rc<ExVar<T>>>,
-    formula: Rc<Formula<E>>
+    formula:    Rc<Formula<E>>
 }
 
 impl<T:OrdT, E:Eval<Output = T>> Intensional<T, E> {
@@ -53,19 +49,51 @@ impl<T:OrdT, E:Eval<Output = T>> Intensional<T, E> {
         scp.sort_by(|a, b| a.label().cmp(b.label()));
         Self { scope: scp, formula: Rc::new(atom!(pred))}
     }
+
+    fn snapshot(&self) -> Self {
+        let mut new_scope = Vec::new();
+        for v in self.scope.iter() {
+            new_scope.push(Rc::new(v.deep_clone()));
+        }
+        Self {
+            scope: new_scope,
+            formula: self.formula.clone()
+        }
+    }
 }
 
-impl<T:OrdT, E:Eval<Output = T>> Constraint<T> for Intensional<T, E> {
+impl<T:OrdT + 'static, E:Eval<Output = T> + 'static> Constraint<T> for Intensional<T, E> {
+
+    fn deep_clone(&self) -> Rc<dyn Constraint<T>> {
+        Rc::new(self.snapshot())
+    }
+
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.formula)
     }
 
     fn apply(&self, asn: &Vec<VValue<T>>) -> bool {
+        //debug
+        //println!("is {} allows {}", self.formula,
+        //         format!("{{ {} }}", asn.into_iter().map(|vv| vv.to_string()).collect::<Vec<_>>().join(",")));
         eval_formula(&self.formula, asn).to_bool().unwrap()
     }
 
     fn scp(&self) -> &[Rc<ExVar<T>>] {
         &self.scope
+    }
+}
+
+impl<T: OrdT, E: Eval<Output = T>> Intensional<T, E> {
+    fn deep_clone(&self) -> Self {
+        let mut new_scope = Vec::new();
+        for v in self.scope.iter() {
+            new_scope.push(Rc::new(v.deep_clone()));
+        }
+        Self {
+            scope: new_scope,
+            formula: self.formula.clone(),
+        }
     }
 }
 
@@ -95,13 +123,13 @@ mod tests {
 use crate::csp::ast::pred::Pred;
 use crate::csp::ast::formula::Formula;
 use std::rc::Rc;
-    use crate::csp::constraint::constraint::Constraint;
     use crate::csp::domain::setdom::SetDom;
     use crate::csp::domain::domain::Domain;
     use crate::csp::truth::Truth;
     use crate::csp::variable::extvar::ExVar;
     use crate::csp::variable::vvalue::{vv, VValue};
     use crate::{atom, cst, eq, lt, neq, var, var_dom, vvals};
+    use crate::csp::constraint::constraint::Constraint;
     use crate::csp::constraint::intensional::Intensional;
 
     #[test]

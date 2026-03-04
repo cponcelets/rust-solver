@@ -3,13 +3,27 @@
 - Desc: Extensional Constraints, list of allowed tuples (rel)
 ***************************************/
 
+ // Factory for extensional constraint
+ // Create an extensional constraint with the cartesian product of the domain's vars
+ pub fn make_extensional_from<T:OrdT>(vars: &Vec<Rc<ExVar<T>>>) -> Rc<ExtConstraint<T>> {
+    let mut walker = cartesian_product(vars);
+    let mut rel = Vec::new();
+    //copy from rel (merge?)
+    while let Some(values) = walker.next() {
+        let assignment = make_assignment(vars, values);
+        rel.push(assignment);
+    }
+    Rc::new(ExtConstraint::new(vars.clone(), rel))
+}
+
 /**************************************
             Extensional Constraint
 ***************************************/
 use std::fmt;
 use std::rc::Rc;
-use crate::csp::constraint::constraint::Constraint;
+use crate::csp::constraint::constraint::{cartesian_product, Constraint};
 use crate::csp::domain::domain::OrdT;
+use crate::csp::prelude::vvalue::make_assignment;
 use crate::csp::truth::Truth;
 use crate::csp::variable::extvar::ExVar;
 use crate::csp::variable::vvalue::{VValue};
@@ -24,9 +38,25 @@ impl<T: OrdT> ExtConstraint<T> {
     pub fn new( scp: Vec<Rc<ExVar<T>>>, rel: Vec<Vec<VValue<T>>>) -> Self {
         ExtConstraint { scope: scp, allowed: rel }
     }
+
+    fn snapshot(&self) -> Self {
+        let mut new_scope = Vec::new();
+        for v in self.scope.iter() {
+            new_scope.push(Rc::new(v.deep_clone()));
+        }
+        Self {
+            scope: new_scope,
+            allowed: self.allowed.clone()
+        }
+    }
 }
 
-impl<T: OrdT> Constraint<T> for ExtConstraint<T> {
+impl<T: OrdT + 'static> Constraint<T> for ExtConstraint<T> {
+
+    fn deep_clone(&self) -> Rc<dyn Constraint<T>> {
+        Rc::new(self.snapshot())
+    }
+
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{{")?;
         for i in &self.allowed {
@@ -71,7 +101,6 @@ impl<T: OrdT> Constraint<T> for ExtConstraint<T> {
 
     fn scp(&self) -> &[Rc<ExVar<T>>] { &self.scope }
 }
-
 
 /**************************************
             Unit Tests

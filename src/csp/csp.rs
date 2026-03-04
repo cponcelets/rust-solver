@@ -1,3 +1,10 @@
+/**************************************
+- Author: Clement Poncelet
+- Desc: Constraint Satisfaction problem representation (C, <V, D>), contains:
+    - C, the set of constraints
+    - V, over Variables defined on D domains
+***************************************/
+
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::rc::Rc;
@@ -194,6 +201,10 @@ impl<T:OrdT> Csp<T> {
     //--- --- ------ --- ------ --- ------ --- ---
     pub fn past(&self) -> &Vec<String> {&self.past}
     pub fn level(&self) -> usize {self.past.len()}
+    pub fn assign(&mut self, vvalue: VValue<T>) {
+        self.vars.get(&vvalue.label).unwrap().dom_mut().reduce_to(&vvalue.value, self.level());
+        self.past.push(vvalue.label);
+    }
 
 }
 

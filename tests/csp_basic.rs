@@ -7,10 +7,13 @@ use rust_solver::csp::constraint::intensional::Intensional;
 use rust_solver::csp::constraint::constraint::Constraint;
 use rust_solver::csp::csp::Csp;
 use rust_solver::csp::prelude::*;
-use rust_solver::csp::domain::setdom::{SetDom};
+use rust_solver::csp::domain::setdom::SetDom;
 use rust_solver::csp::domain::domain::Domain;
 use rust_solver::csp::prelude::vvalue::vv;
 use rust_solver::{eq, lt, neq, var, var_dom};
+
+mod validtuples;
+mod var;
 
 #[test]
 fn test_lc_and_solution() { //Book's Example

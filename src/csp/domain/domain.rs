@@ -42,6 +42,8 @@ pub trait Domain<T:OrdT> {
     fn active_values(&self) -> Vec<T>;
     fn head(&self) -> Option<T>;
     fn tail(&self) -> Option<T>;
+    fn absent(&self, v: &T) -> usize;
+    fn next(&self, v: &T) -> Option<T>;
     fn remove_value(&mut self, v : &T, lvl : usize) -> ();
     //assignment
     fn reduce_to(&mut self, v : &T, lvl : usize) -> ();

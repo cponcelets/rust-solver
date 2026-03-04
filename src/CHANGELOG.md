@@ -30,3 +30,31 @@
 - Module Solver
   - Module GAC, implementation of the first GAC algorithm
   - Example on domino
+
+## [0.1.0] - 2026-03-04
+
+- Module AST:
+  - Pretty print using format
+- Module Constraint:
+  - Add consistency methods: 
+    - Valid tuple checking
+    - Get first invalid position
+  - make_extensional_from for helping constructing extensional constraints
+  - snapshot (deep cloning)
+- Module Domain:
+  - add method to access absent and next
+- Module Variable:
+  - add Hash (using label) for vvalue 
+- Module CSP:
+  - add fn assign(&mut self, vvalue: VValue<T>);
+- Module solver:
+  - add module consistency with:
+    - definition of types arc and cvalue
+    - consistency.rs (front)
+    - fc.rs for testing forward consistency (AC1)
+    - revise for different revising algorithm
+      - AC, AC and AC2001
+    - scheme for different oriented consistency enforcement
+      - Arc and Variable oriented
+- Module test:
+  - Add tests for valid tuples and variable oriented algorithm (AC1)

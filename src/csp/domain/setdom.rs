@@ -94,6 +94,27 @@ impl<T:OrdT> Domain<T> for SetDom<T> {
     }
     fn head(&self) -> Option<T> { Some(self.values[self.head-1].clone()) }
     fn tail(&self) -> Option<T> { Some(self.values[self.tail-1].clone()) }
+    fn absent(&self, v: &T) -> usize {
+        match self.values.iter().position(|i| i == v) {
+           Some(idx) => self.absent[idx],
+            None => panic!()
+        }
+    }
+    fn next(&self, v: &T) -> Option<T> {
+        //if self.active_values().contains(v) { not expected here
+            match self.values.iter().position(|i| i == v) {
+                Some(idx) => {
+                    if self.next[idx] == 0 {
+                        return None
+                    } else {
+                        return Some(self.values[self.next[idx] - 1].clone())
+                    }
+                }
+                _ => {}
+            }
+        //}
+        None
+    }
     fn remove_value(&mut self, v : &T, lvl : usize) -> () {
         if self.active_values().contains(v) {
             match self.values.iter().position(|i| i == v) {
@@ -256,7 +277,7 @@ impl<T:OrdT> Iterator for CartesianWalker<T> {
 
 #[cfg(test)]
 mod tests {
-use crate::csp::domain::setdom::{SetDom, CartesianWalker};
+    use crate::csp::domain::setdom::{SetDom, CartesianWalker};
     use crate::csp::domain::domain::Domain;
 
     #[test]

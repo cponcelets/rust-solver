@@ -26,9 +26,19 @@ pub fn make_assignment<T:OrdT>(scope: &[Rc<ExVar<T>>], values: Vec<T>)
         .collect()
 }
 
+pub fn vv_from_hashmap<T:OrdT>(h: &HashMap<String, T>)
+                               -> Vec<VValue<T>> {
+    //sort hash
+    let mut sorted_list = h.iter().collect::<Vec<_>>();
+    sorted_list.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+
+    sorted_list.into_iter().map(|(k,v)| vv(k.clone(), v.clone())).collect()
+}
+
 /**************************************
             V-Values
 ***************************************/
+use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;

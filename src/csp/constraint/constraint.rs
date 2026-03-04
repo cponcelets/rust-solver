@@ -10,6 +10,7 @@
             Trait Constraint
 ***************************************/
 use std::cmp::Ordering::Equal;
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -23,6 +24,7 @@ use crate::csp::csp::exists_extension;
 pub trait Constraint<T:OrdT> : Debug {
 
     //Trait : Methods to implement ---
+    fn deep_clone(&self) -> Rc<dyn Constraint<T>>;
 
     //Display trait implementation
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
@@ -75,6 +77,11 @@ pub trait Constraint<T:OrdT> : Debug {
             },
             None => Truth::Unknown, // variable not in scope ⇒ constraint unaffected
         }
+    }
+
+    //to check is_valid for assignments
+    fn is_valid_asn(&self, asn: &Vec<VValue<T>>) -> Truth {
+        Truth::from(asn.iter().all(|vv| self.is_valid(vv).to_bool().unwrap()))
     }
 
     // From a v-value (x, a), returns:
@@ -250,7 +257,7 @@ pub trait Constraint<T:OrdT> : Debug {
     fn rel(&self) -> Vec<Vec<VValue<T>>> {
         let mut ret = Vec::new();
         let scope = self.scp();
-        let mut walker = self.cartesian_product();
+        let mut walker = cartesian_product(self.scp());
 
         while let Some(values) = walker.next() {
             let assignment = make_assignment(scope, values);
@@ -260,6 +267,41 @@ pub trait Constraint<T:OrdT> : Debug {
             }
         }
         ret
+    }
+
+    //---------------------------------------------------
+    //                      Consistency
+    //---------------------------------------------------
+    //Validity check
+    fn is_valid_tuple(&self, tuple : Option<&HashMap<String, T>>) -> bool {
+        match tuple {
+            Some(tau) => {
+                for v in self.scp() {
+                    let t = tau.get(v.label()).expect("Error accessing tuple");
+                    if !self.is_valid(&vv(v.label().clone(), t.clone())).to_bool().unwrap() {
+                        return false;
+                    }
+                }
+            },
+            None => return false
+        }
+        true
+    }
+
+    fn get_first_invalid_pos(&self, tuple : Option<&HashMap<String, T>>) -> i32 {
+        match tuple {
+            Some(tau) => {
+                for i in 1..(self.scp().len()+1) {
+                    let v = self.scp()[i-1].clone();
+                    let t = tau.get(v.label()).expect("Error accessing tuple");
+                    if !self.is_valid(&vv(v.label().clone(), t.clone())).to_bool().unwrap() {
+                        return i as i32;
+                    }
+                }
+            },
+            None => panic!("tuple should be different from None")
+        }
+        -1
     }
 
     //---------------------------------------------------
@@ -295,18 +337,22 @@ pub trait Constraint<T:OrdT> : Debug {
             .map(|v| v.valid_values().len())
             .product()
     }
-
-    fn cartesian_product(&self) -> CartesianWalker<T> {
-        let doms: Vec<Vec<T>> = self.scp()
-            .iter()
-            .map(|v| v.dom().active_values())
-            .collect();
-        CartesianWalker::new(doms)
-    }
 }
 
 impl<T:OrdT> fmt::Display for dyn Constraint<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Constraint::fmt(self, f)
     }
+}
+
+//---------------------------------------------------
+//                      Utilities
+//---------------------------------------------------
+
+pub fn cartesian_product<T:OrdT>(vars : &[Rc<ExVar<T>>]) -> CartesianWalker<T> {
+    let doms: Vec<Vec<T>> = vars
+        .iter()
+        .map(|v| v.dom().active_values())
+        .collect();
+    CartesianWalker::new(doms)
 }
