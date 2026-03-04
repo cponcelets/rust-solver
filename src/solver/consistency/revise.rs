@@ -13,24 +13,27 @@ use crate::csp::constraint::constraint::Constraint;
 use crate::csp::domain::domain::{Domain, OrdT};
 use crate::csp::prelude::extvar::ExVar;
 use crate::csp::prelude::vvalue::{vv, vv_from_hashmap};
+use crate::instrumentation::monitor::Monitor;
 use crate::solver::consistency::arc::Arc;
 use crate::solver::consistency::cvalue::CValue;
 
-pub trait Revise<T: OrdT> {
-    fn revise(&mut self, arc : &Arc<T>, level: usize) -> bool;
+pub trait Revise<M: Monitor, T: OrdT> {
+    fn revise(&mut self, arc : &Arc<T>, level: usize, monitor: &mut M) -> bool;
 }
 
 pub struct AC1;
 
-impl<T:OrdT> Revise<T> for AC1 {
+impl<M: Monitor, T:OrdT> Revise<M, T> for AC1 {
     //simple version AC1?
     //true if revision (c,x) effective
-    fn revise(&mut self, arc: &Arc<T>, level: usize) -> bool {
-        //self.monitor.on_revise();
+    fn revise(&mut self, arc: &Arc<T>, level: usize, monitor : &mut M) -> bool {
+        monitor.on_revision_check();
         let size_before = arc.variable.dom().size();
         for a in arc.variable.valid_values() {
+            monitor.on_constraint_check();
             if !seek_support(arc.constraint.clone(), arc.variable.clone(), &a) {
                 println!("remove {} from {}", a, arc.variable);
+                monitor.on_value_deleted();
                 arc.variable.dom_mut().remove_value(&a, level);
             }
         }
@@ -44,8 +47,9 @@ fn seek_support<T:OrdT>(c: Rc<dyn Constraint<T>>, x: Rc<ExVar<T>>, a: &T) -> boo
 
 pub struct AC3;
 
-impl<T:OrdT> Revise<T> for AC3 {
-    fn revise(&mut self, arc : &Arc<T>, level: usize) -> bool {
+impl<M: Monitor, T:OrdT> Revise<M, T> for AC3 {
+    fn revise(&mut self, arc : &Arc<T>, level: usize, monitor : &mut M) -> bool {
+        monitor.on_revision_check();
         //AC3
         let size_before = arc.variable.dom().size();
         for a in arc.variable.valid_values() {
@@ -53,8 +57,10 @@ impl<T:OrdT> Revise<T> for AC3 {
                 constraint: arc.constraint.clone(),
                 variable: arc.variable.clone(),
                 value: a.clone()
-            }) {
+                },
+                monitor) {
                 println!("remove {} from {}", &a, arc.variable);
+                monitor.on_value_deleted();
                 arc.variable.dom_mut().remove_value(&a, level);
             }
         }
@@ -62,9 +68,10 @@ impl<T:OrdT> Revise<T> for AC3 {
     }
 }
 
-fn seek_support3<T:OrdT>(cval:&CValue<T>) -> bool {
+fn seek_support3<M: Monitor, T:OrdT>(cval:&CValue<T>, monitor: &mut M) -> bool {
     let mut tuple = Some(cval.get_first_valid_tuple());
     while !tuple.is_none() {
+        monitor.on_constraint_check();
         let tau = tuple.unwrap();
         if cval.constraint.check_assignment(&vv_from_hashmap(&tau)).to_bool().unwrap() {
             return true;
@@ -74,12 +81,14 @@ fn seek_support3<T:OrdT>(cval:&CValue<T>) -> bool {
     false
 }
 
-pub struct AC2001<T: OrdT> {
+pub struct AC2001<M: Monitor, T: OrdT> {
     last: HashMap<String, HashMap<String, T>>,
+    _phantom: std::marker::PhantomData<M>
 }
 
-impl<T:OrdT> Revise<T> for AC2001<T> {
-    fn revise(&mut self, arc : &Arc<T>, level: usize) -> bool {
+impl<M: Monitor, T:OrdT> Revise<M, T> for AC2001<M, T> {
+    fn revise(&mut self, arc : &Arc<T>, level: usize, monitor : &mut M) -> bool {
+        monitor.on_revision_check();
         //AC2001
         let size_before = arc.variable.dom().size();
         for a in arc.variable.valid_values() {
@@ -87,8 +96,10 @@ impl<T:OrdT> Revise<T> for AC2001<T> {
                 constraint: arc.constraint.clone(),
                 variable: arc.variable.clone(),
                 value: a.clone()
-            }) {
+                },
+                monitor) {
                 println!("remove {} from {}", &a, arc.variable);
+                monitor.on_value_deleted();
                 arc.variable.dom_mut().remove_value(&a, level);
             }
         }
@@ -96,17 +107,18 @@ impl<T:OrdT> Revise<T> for AC2001<T> {
     }
 }
 
-impl<T:OrdT> AC2001<T> {
+impl<M: Monitor, T:OrdT> AC2001<M, T> {
     pub(crate) fn new() -> Self {
         Self {
-            last: HashMap::new()
+            last: HashMap::new(),
+            _phantom: std::marker::PhantomData
         }
     }
 
     pub fn last_supports(&self) -> &HashMap<String, HashMap<String, T>> {&self.last}
 
     //optimal for binary constraints
-    fn seek_support2001(&mut self, cval: CValue<T>) -> bool {
+    fn seek_support2001(&mut self, cval: CValue<T>, monitor: &mut M) -> bool {
         let mut tau = None;
         let last_support = self.last.get(&cval.label());
 
@@ -123,6 +135,7 @@ impl<T:OrdT> AC2001<T> {
         }
         while !tau.is_none() {
             let t = tau.expect("Should not be None!");
+            monitor.on_constraint_check();
             if cval.constraint.check_assignment(&vv_from_hashmap(&t)).to_bool().unwrap() {
                 if let Some (e) = self.last.get_mut(&cval.label()) {
                     *e = t;
@@ -155,6 +168,7 @@ mod tests {
     use crate::csp::constraint::intensional::Intensional;
     use crate::csp::prelude::domain::Domain;
     use crate::csp::prelude::vvalue::{vv_from_hashmap, VValue};
+    use crate::instrumentation::monitor::Statistics;
     use crate::solver::consistency::arc::{Arc};
     use crate::solver::consistency::cvalue::CValue;
     use crate::solver::consistency::revise::{Revise, AC2001, AC3};
@@ -189,12 +203,14 @@ mod tests {
         //also check the calls to revise ? -> Stats?
         let revision = Arc { constraint: c.clone(), variable: x.clone() };
         let mut consistency_ac3 = AC3;
+        let mut monitor_ac3 = Statistics::default();
         //nothing to change
-        assert!(!consistency_ac3.revise(&revision, 1));
+        assert!(!consistency_ac3.revise(&revision, 1, &mut monitor_ac3));
         //8 constraints checks
+        assert_eq!(monitor_ac3.checks, 8);
 
         let mut consistency_ac2001 = AC2001::new();
-        assert!(!consistency_ac2001.revise(&revision, 1));
+        assert!(!consistency_ac2001.revise(&revision, 1, &mut monitor_ac3)); //just to not use NoMonitor...
         assert_eq!(vv_from_hashmap(consistency_ac2001.last_supports().get(
             &CValue { constraint: c.clone(), variable: x.clone(), value: "a" }.label())
             .expect("Should not be None")),
@@ -213,11 +229,16 @@ mod tests {
         //Suppose now that the `v-value` $(y, c)$ has been deleted
         y.dom_mut().remove_value(&"c", 2);
 
+        let mut monitor_ac2001 = Statistics::default();
         //GAC3 -> 7 constraints checks
-        assert!(!consistency_ac3.revise(&revision, 1)); //still nothing to remove
+        assert!(!consistency_ac3.revise(&revision, 1, &mut monitor_ac2001)); //still nothing to remove
+        assert_eq!(monitor_ac2001.checks, 7);
 
+        let mut monitor_ac2001_2 = Statistics::default();
         //GAC2001 -> 1 constraints check + 3 validity checks
-        assert!(!consistency_ac2001.revise(&revision, 1));
+        assert!(!consistency_ac2001.revise(&revision, 1, &mut monitor_ac2001_2));
+        assert_eq!(monitor_ac2001_2.checks, 1);
+        //add validity checks? (push the monitor into constraints
         assert_eq!(vv_from_hashmap(consistency_ac2001.last_supports().get(
             &CValue { constraint: c.clone(), variable: x.clone(), value: "a" }.label())
             .expect("Should not be None")),

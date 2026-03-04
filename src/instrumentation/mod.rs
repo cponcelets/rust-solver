@@ -1,1 +1,1 @@
-mod SolverMonitor;
+pub mod monitor;

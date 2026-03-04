@@ -22,6 +22,7 @@ use rust_solver::csp::domain::domain::Domain;
 use rust_solver::solver::consistency::consistency::Consistency;
 use rust_solver::solver::consistency::revise::AC1;
 use rust_solver::solver::consistency::scheme::VariableOriented;
+use rust_solver::instrumentation::monitor::NoMonitor;
 
 #[test]
 fn domino_example() {
@@ -67,7 +68,7 @@ fn domino_example() {
 
     let mut csp = Csp::new(vmap, vec![Rc::new(c1), Rc::new(c2), Rc::new(c3), Rc::new(c4)]);
 
-    let mut consistency = Consistency::new(VariableOriented, AC1);
+    let mut consistency = Consistency::new(VariableOriented, AC1, NoMonitor);
     let vars = csp.vars().keys().cloned().collect();
     consistency.enforce_consistency(&mut csp, vars); //standalone
     //Note: step 5 (c_wz, x) is not fruitless since (w,0) has no supports for c_wz

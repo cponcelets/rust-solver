@@ -58,3 +58,13 @@
       - Arc and Variable oriented
 - Module test:
   - Add tests for valid tuples and variable oriented algorithm (AC1)
+
+## [0.1.0] - 2026-03-04
+- Add module instrumentation for monitoring solver
+- Module Consistency
+  - add monitors and tests
+  - for now:
+    - enforce_calls, total_enforce_time 
+    - nb_arc_enqueue, max_queue_size, 
+    - revise_calls, revise_fruitless, checks,
+    - domain_wipeouts, value_deletions, domain_histogram

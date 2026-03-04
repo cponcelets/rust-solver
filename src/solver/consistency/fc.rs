@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::csp::csp::Csp;
 use crate::csp::domain::domain::{Domain, OrdT};
 use crate::csp::prelude::extvar::ExVar;
+use crate::instrumentation::monitor::NoMonitor;
 use crate::solver::consistency::arc::{Arc};
 use crate::solver::consistency::revise::{Revise, AC1};
 
@@ -24,7 +25,7 @@ fn apply_fc_set<T:OrdT>(csp :&Csp<T>, events: Vec<&String>) -> bool {
         if c.scp().iter().any(|x| events.contains(&x.label())) {
             for y in c.scp() {
                 if !csp.past().contains(&y.label()) {
-                    if ac1.revise(&Arc { constraint: c.clone(), variable: y.clone() }, csp.level()) {
+                    if ac1.revise(&Arc { constraint: c.clone(), variable: y.clone() }, csp.level(), &mut NoMonitor) {
                         if y.dom().is_empty() {
                             return false;
                         }

@@ -12,17 +12,19 @@ use std::rc::Rc;
 use crate::csp::csp::Csp;
 use crate::csp::prelude::domain::{Domain, OrdT};
 use crate::csp::prelude::extvar::ExVar;
+use crate::instrumentation::monitor::Monitor;
 use crate::solver::consistency::arc::{Arc};
 use crate::solver::consistency::consistency::Revise;
 
-pub trait Scheme <T: OrdT, R: Revise<T>> {
-    fn enforce(&mut self, csp: &mut Csp<T>, events: Vec<String>, revise: &mut R) -> bool;
+pub trait Scheme <M: Monitor, T: OrdT, R: Revise<M, T>> {
+    fn enforce(&mut self, csp: &mut Csp<T>, events: Vec<String>, revise: &mut R, monitor: &mut M) -> bool;
 }
 
 pub struct ArcOriented;
 
-impl<T: OrdT, R: Revise<T>> Scheme<T, R> for ArcOriented {
-    fn enforce(&mut self, csp :&mut Csp<T>, events: Vec<String>, revise: &mut R) -> bool {
+impl<M: Monitor, T: OrdT, R: Revise<M, T>> Scheme<M, T, R> for ArcOriented {
+    fn enforce(&mut self, csp :&mut Csp<T>, events: Vec<String>, revise: &mut R, monitor: &mut M) -> bool {
+        monitor.on_enforce_start();
         // return next arc
         let mut queue: Vec<Arc<T>> = vec![];
 
@@ -37,6 +39,7 @@ impl<T: OrdT, R: Revise<T>> Scheme<T, R> for ArcOriented {
                     //not in past
                     for y in c.scp() {
                         if y.label() != x.label() && events.contains(&y.label()) {
+                            monitor.on_enqueue();
                             queue.push(Arc { constraint: c.clone(), variable: x.clone() })
                         }
                     }
@@ -48,10 +51,14 @@ impl<T: OrdT, R: Revise<T>> Scheme<T, R> for ArcOriented {
         let mut step = 1;
         while queue.len() > 0 {
             println!("{}", format!("Step {} Q {}", step, queue.iter().map(|ar| ar.to_string()).collect::<Vec<_>>().join("")));
+            monitor.on_dequeue();
             let arc_cx = queue.remove(0);
             println!("Pick {} from Q", arc_cx);
-            if revise.revise(&arc_cx, csp.level()) {
+            if revise.revise(&arc_cx, csp.level(), monitor) {
                 if arc_cx.variable.dom().is_empty() {
+                    monitor.on_domain_wipeout();
+                    monitor.on_enforce_end();
+                    monitor.on_domain_snapshot(csp);
                     return false; //raise dom_wipeout
                 }
                 for c in csp.constraints() {
@@ -62,6 +69,7 @@ impl<T: OrdT, R: Revise<T>> Scheme<T, R> for ArcOriented {
                         for x in c.scp() {
                             if  x.label() != arc_cx.variable.label() &&
                                 !csp.past().contains(x.label()) {
+                                monitor.on_enqueue();
                                 //x' != x && x' not in past
                                 queue.push(Arc { constraint: c.clone(), variable: x.clone() })
                             }
@@ -69,17 +77,22 @@ impl<T: OrdT, R: Revise<T>> Scheme<T, R> for ArcOriented {
                     }
                 }
             } else {
-                println!("Frutless");
+                monitor.on_revise_fruitless();
+                println!("Fruitless");
             }
             step +=1;
         }
+        monitor.on_enforce_end();
+        monitor.on_domain_snapshot(csp);
         true
     }
 }
 
 pub struct VariableOriented;
-impl<T: OrdT, R: Revise<T>> Scheme<T, R> for VariableOriented {
-    fn enforce(&mut self, csp: &mut Csp<T>, events: Vec<String>, revise: &mut R) -> bool {
+impl<M: Monitor, T: OrdT, R: Revise<M, T>> Scheme<M, T, R> for VariableOriented {
+    fn enforce(&mut self, csp: &mut Csp<T>, events: Vec<String>, revise: &mut R, monitor: &mut M) -> bool {
+        monitor.on_enforce_start();
+
         let mut queue: Vec<Rc<ExVar<T>>> = vec![];
         let mut stamp_var: HashMap<String, usize> = HashMap::new();
         let mut stamp_ctr: HashMap<String, usize> = HashMap::new();
@@ -92,13 +105,14 @@ impl<T: OrdT, R: Revise<T>> Scheme<T, R> for VariableOriented {
         //insert: algorithm 10
         for v in vars {
             if events.contains(&v.label()) {
-                insert(&mut queue, &mut stamp_var, v, &mut time);
+                insert(&mut queue, &mut stamp_var, v, &mut time, monitor);
             }
         }
 
         let mut step = 1;
         while queue.len() > 0 {
             println!("{}", format!("Step {} Q {}", step, queue.iter().map(|v| v.label().clone()).collect::<Vec<_>>().join(",")));
+            monitor.on_dequeue();
             let x = queue.remove(0);
             println!("Pick {} from Q", x);
 
@@ -110,13 +124,17 @@ impl<T: OrdT, R: Revise<T>> Scheme<T, R> for VariableOriented {
                                 || c.scp().iter()
                                 .any(|z| *z != x && stamp_var.get(z.label()) > stamp_ctr.get(&c.label())) {
                                 println!("Revise <{},{}>", c.label(), y.label());
-                                if revise.revise(&Arc { constraint: c.clone(), variable: y.clone() }, csp.level()) {
+                                if revise.revise(&Arc { constraint: c.clone(), variable: y.clone() }, csp.level(), monitor) {
                                     if y.dom().is_empty() {
+                                        monitor.on_domain_wipeout();
+                                        monitor.on_enforce_end();
+                                        monitor.on_domain_snapshot(csp);
                                         return false; //raise dom_wipeout
                                     }
-                                    insert(&mut queue, &mut stamp_var, y.clone(), &mut time);
+                                    insert(&mut queue, &mut stamp_var, y.clone(), &mut time, monitor);
                                 } else {
-                                    println!("Frutless");
+                                    println!("Fruitless");
+                                    monitor.on_revise_fruitless();
                                 }
                             }
                         }
@@ -127,12 +145,15 @@ impl<T: OrdT, R: Revise<T>> Scheme<T, R> for VariableOriented {
             }
             step +=1;
         }
+        monitor.on_enforce_end();
+        monitor.on_domain_snapshot(csp);
         true
     }
 }
 
 //helper to insert values into queue
-fn insert<T: OrdT>(queue : &mut Vec<Rc<ExVar<T>>>, stamp_var: &mut HashMap<String, usize>, v : Rc<ExVar<T>>,  time : &mut usize) {
+fn insert<M:Monitor, T: OrdT>(queue : &mut Vec<Rc<ExVar<T>>>, stamp_var: &mut HashMap<String, usize>, v : Rc<ExVar<T>>,  time : &mut usize, monitor: &mut M) {
+    monitor.on_enqueue();
     queue.push(v.clone());
     *time +=1;
     if let Some (t) =stamp_var.get_mut(&v.label().clone()) {
@@ -159,6 +180,7 @@ mod tests {
     use crate::{add, and, atom, base, cst, eq, lt, or, var, var_dom};
     use crate::csp::constraint::intensional::Intensional;
     use crate::csp::csp::Csp;
+    use crate::instrumentation::monitor::{NoMonitor, Statistics};
     use crate::solver::consistency::revise::AC1;
     use crate::solver::consistency::scheme::{ArcOriented, Scheme};
 
@@ -191,7 +213,7 @@ mod tests {
     fn stand_alone_arc() {
         let mut csp = setup_csp::<i32>();
         let vars = csp.0.vars().keys().cloned().collect();
-        assert!(ArcOriented.enforce(&mut csp.0, vars, &mut AC1));
+        assert!(ArcOriented.enforce(&mut csp.0, vars, &mut AC1, &mut NoMonitor));
     }
 
     #[test]
@@ -240,11 +262,16 @@ mod tests {
         let mut csp = Csp::new(vmap, vec![Rc::new(c1), Rc::new(c2), Rc::new(c3), Rc::new(c4)]);
         let mut arc_scheme = ArcOriented;
         let vars = csp.vars().keys().cloned().collect();
-        arc_scheme.enforce(&mut csp, vars, &mut AC1); //standalone
+        let mut stats = Statistics::default();
+        arc_scheme.enforce(&mut csp, vars, &mut AC1, &mut stats); //standalone
         //Note: step 7 (c_wz, w) is not fruitless since (w,0) has no supports for c_wz
         //Hyp: switched between w and z (z,0) actually works since w = 0 + 1 is fine
         //Result: all domains reduced to {3}
         assert!(csp.vars().values().all(|v| v.dom().size() == 1));
         assert!(csp.vars().values().all(|v| v.dom().active_values() == vec![3]));
+
+        let avg = stats.total_enforce_time / stats.enforce_calls as u32;
+        println!("Lasting {} millisecond(s) in average", avg.as_millis());
+        println!("{:#?}", stats.domain_histogram);
     }
 }

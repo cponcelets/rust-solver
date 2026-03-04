@@ -1,6 +1,6 @@
 pub mod csp;
 pub mod solver;
-mod instrumentation;
+pub mod instrumentation;
 
 #[cfg(test)]
 mod tests {}
